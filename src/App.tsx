@@ -1596,11 +1596,11 @@ export default function App() {
                 {reconcileMode === 'b2c' ? (
                   /* B2C 2-Step 매칭 뷰 */
                   <div className="pt-6 space-y-6">
-                    {/* 데이터 소스 선택: 실제 엑셀 업로드 vs 데모 시나리오 */}
+                    {/* 데이터 소스 선택: 파일 직접 올리기 vs 샘플 데이터로 보기 */}
                     <div className="flex flex-wrap items-center justify-between gap-3 bg-[#F8FAFC] p-3.5 rounded-xl border border-slate-200">
                       <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
                         <FileSpreadsheet className="w-4 h-4 text-[#1E40AF]" />
-                        <span>대사 데이터 입력 방식:</span>
+                        <span>진행 방식:</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
@@ -1612,7 +1612,7 @@ export default function App() {
                           }`}
                         >
                           <UploadCloud className="w-3.5 h-3.5" />
-                          <span>실제 엑셀/CSV 파일 드래그 & 드롭 대사 (1순위 신규)</span>
+                          <span>엑셀 파일 직접 올리기</span>
                         </button>
                         <button
                           onClick={() => setB2cSource('preset')}
@@ -1623,7 +1623,7 @@ export default function App() {
                           }`}
                         >
                           <FileCheck className="w-3.5 h-3.5" />
-                          <span>데모 프리셋 시나리오 (네이버/쿠팡)</span>
+                          <span>샘플 데이터로 보기</span>
                         </button>
                       </div>
                     </div>
@@ -1638,10 +1638,10 @@ export default function App() {
                           <div>
                             <span className="font-bold text-xs text-[#0F172A] flex items-center gap-1.5">
                               <Sparkles className="w-3.5 h-3.5 text-[#1E40AF]" />
-                              테스트용 샘플 엑셀 파일 바로 다운로드
+                              테스트용 샘플 엑셀 다운로드
                             </span>
                             <p className="text-[11px] text-slate-500 mt-0.5">
-                              직접 준비된 엑셀이 없으시다면 아래 샘플을 다운로드하여 곧바로 드래그 앤 드롭해 보세요.
+                              직접 준비된 엑셀 파일이 없으시다면 아래 샘플을 다운로드하여 곧바로 올려보세요.
                             </p>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
@@ -1650,21 +1650,21 @@ export default function App() {
                               className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-[#1E40AF] font-bold text-xs transition flex items-center gap-1.5 shadow-2xs"
                             >
                               <Download className="w-3.5 h-3.5" />
-                              <span>📥 샘플 은행 입금원장 엑셀</span>
+                              <span>📥 은행 입금 내역 샘플</span>
                             </button>
                             <button
                               onClick={() => handleDownloadSampleSettlementFile('match')}
                               className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-emerald-700 font-bold text-xs transition flex items-center gap-1.5 shadow-2xs"
                             >
                               <Download className="w-3.5 h-3.5" />
-                              <span>📥 샘플 네이버 정산 엑셀 (일치)</span>
+                              <span>📥 네이버 정산서 샘플 (일치)</span>
                             </button>
                             <button
                               onClick={() => handleDownloadSampleSettlementFile('diff')}
                               className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-rose-600 font-bold text-xs transition flex items-center gap-1.5 shadow-2xs"
                             >
                               <Download className="w-3.5 h-3.5" />
-                              <span>📥 샘플 쿠팡 정산 엑셀 (차액)</span>
+                              <span>📥 쿠팡 정산서 샘플 (차액)</span>
                             </button>
                           </div>
                         </div>
@@ -1692,7 +1692,7 @@ export default function App() {
                             <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
                               <span className="font-bold text-xs text-[#0F172A] flex items-center gap-1.5">
                                 <span className="w-5 h-5 rounded-md bg-blue-100 text-[#1E40AF] flex items-center justify-center font-bold text-[11px]">A</span>
-                                은행 통장 거래 내역 원장 (Bank Statement)
+                                은행 통장 입금 내역 (통장 원장)
                               </span>
                               <span className="text-[10px] text-slate-400">지원: .xlsx, .xls, .csv</span>
                             </div>
@@ -1780,7 +1780,7 @@ export default function App() {
                             <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
                               <span className="font-bold text-xs text-[#0F172A] flex items-center gap-1.5">
                                 <span className="w-5 h-5 rounded-md bg-orange-100 text-orange-700 flex items-center justify-center font-bold text-[11px]">B</span>
-                                플랫폼 정산 엑셀 원장 (Settlement Sheet)
+                                쇼핑몰/플랫폼 정산 내역 (정산서)
                               </span>
                               <span className="text-[10px] text-slate-400">네이버/쿠팡/자사몰 등</span>
                             </div>
