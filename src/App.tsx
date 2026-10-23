@@ -773,13 +773,66 @@ export default function App() {
     if (target) target.value += Number(r.amount || 0);
   });
 
-  // 주차별 리스크 시계열 추이 (만원 단위)
-  const riskTrendData = [
-    { week: '10월 1주차', fee: 120, returnLoss: 40, damage: 15, etc: 5 },
-    { week: '10월 2주차', fee: 180, returnLoss: 65, damage: 25, etc: 8 },
-    { week: '10월 3주차', fee: 240, returnLoss: 90, damage: 30, etc: 10 },
-    { week: '10월 4주차 (현재)', fee: 310, returnLoss: 124, damage: 35, etc: 12 },
-  ];
+  const totalRiskValue = riskCategories.reduce((sum, c) => sum + c.value, 0);
+  const sortedRisks = [...riskCategories].sort((a, b) => b.value - a.value);
+  const maxRisk = sortedRisks[0];
+  const maxRiskPct = totalRiskValue > 0 ? ((maxRisk.value / totalRiskValue) * 100).toFixed(1) : '0';
+
+  // 채널별 주차별 리스크 시계열 추이 (만원 단위) & 인사이트 요약
+  const channelTrendMap: Record<string, {
+    data: Array<{ week: string; fee: number; returnLoss: number; damage: number; etc: number }>;
+    insightTitle: string;
+    insightValue: string;
+    insightColor: string;
+  }> = {
+    ALL: {
+      data: [
+        { week: '10월 1주차', fee: 120, returnLoss: 40, damage: 15, etc: 5 },
+        { week: '10월 2주차', fee: 180, returnLoss: 65, damage: 25, etc: 8 },
+        { week: '10월 3주차', fee: 240, returnLoss: 90, damage: 30, etc: 10 },
+        { week: '10월 4주차 (현재)', fee: 310, returnLoss: 124, damage: 35, etc: 12 },
+      ],
+      insightTitle: '10월 4주차 전체 반품 손실 증가 추세 감지',
+      insightValue: '+37.8% 주간 상승',
+      insightColor: 'text-rose-600'
+    },
+    COUPANG: {
+      data: [
+        { week: '10월 1주차', fee: 75, returnLoss: 28, damage: 10, etc: 3 },
+        { week: '10월 2주차', fee: 110, returnLoss: 45, damage: 18, etc: 5 },
+        { week: '10월 3주차', fee: 150, returnLoss: 62, damage: 22, etc: 7 },
+        { week: '10월 4주차 (현재)', fee: 195, returnLoss: 86, damage: 26, etc: 8 },
+      ],
+      insightTitle: '쿠팡 로켓 반품·고객 클레임 손실 집중 모니터링',
+      insightValue: '+38.7% 주간 증가',
+      insightColor: 'text-rose-600'
+    },
+    SMARTSTORE: {
+      data: [
+        { week: '10월 1주차', fee: 35, returnLoss: 12, damage: 5, etc: 2 },
+        { week: '10월 2주차', fee: 52, returnLoss: 20, damage: 7, etc: 3 },
+        { week: '10월 3주차', fee: 68, returnLoss: 28, damage: 8, etc: 3 },
+        { week: '10월 4주차 (현재)', fee: 88, returnLoss: 38, damage: 9, etc: 4 },
+      ],
+      insightTitle: '스마트스토어 낮은 수수료율 및 안정적 반품률 유지',
+      insightValue: '+11.4% 완만한 추세',
+      insightColor: 'text-emerald-600'
+    },
+    B2B: {
+      data: [
+        { week: '10월 1주차', fee: 10, returnLoss: 0, damage: 0, etc: 0 },
+        { week: '10월 2주차', fee: 18, returnLoss: 0, damage: 0, etc: 0 },
+        { week: '10월 3주차', fee: 22, returnLoss: 0, damage: 0, etc: 0 },
+        { week: '10월 4주차 (현재)', fee: 27, returnLoss: 0, damage: 0, etc: 0 },
+      ],
+      insightTitle: 'B2B 도매 채널 플랫폼 수수료 및 반품 리스크 0원',
+      insightValue: '0% 무리스크 (외상관리 집중)',
+      insightColor: 'text-[#1E40AF]'
+    }
+  };
+
+  const currentTrend = channelTrendMap[channelFilter] || channelTrendMap['ALL'];
+  const riskTrendData = currentTrend.data;
 
   // 컴팩트한 한 줄 범례 렌더러 (글씨 크기 축소 및 줄바꿈 방지)
   const renderCompactLegend = (props: any) => {
@@ -1656,8 +1709,10 @@ export default function App() {
                   </div>
 
                   <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                    <span>최대 손실 원인: <strong>정산수수료 (64.2%)</strong></span>
-                    <span className="text-slate-400">네이버/쿠팡 정산 기준</span>
+                    <span>최대 손실 원인: <strong>{maxRisk && maxRisk.value > 0 ? `${maxRisk.name} (${maxRiskPct}%)` : '손실 내역 없음 (0%)'}</strong></span>
+                    <span className="text-slate-400">
+                      {channelFilter === 'ALL' ? '전체 채널 기준' : channelFilter === 'COUPANG' ? '쿠팡 로켓 정산 기준' : channelFilter === 'SMARTSTORE' ? '스마트스토어 정산 기준' : 'B2B 도매 기준'}
+                    </span>
                   </div>
                 </div>
 
@@ -1669,12 +1724,25 @@ export default function App() {
                         <div className="w-7 h-7 rounded-lg bg-sky-50 flex items-center justify-center text-[#38BDF8]">
                           <TrendingUp className="w-4 h-4" />
                         </div>
-                        <h3 className="font-bold text-sm text-[#0F172A]">주차별 리스크 발생 추이 (Line Chart)</h3>
+                        <h3 className="font-bold text-sm text-[#0F172A]">
+                          주차별 리스크 발생 추이 (Line Chart)
+                          {channelFilter !== 'ALL' && (
+                            <span className="ml-2 text-xs font-semibold text-[#1E40AF] bg-blue-50 px-2 py-0.5 rounded">
+                              {channelFilter === 'COUPANG' ? '쿠팡 로켓' : channelFilter === 'SMARTSTORE' ? '스마트스토어' : 'B2B 도매'}
+                            </span>
+                          )}
+                        </h3>
                       </div>
                       <span className="text-xs text-slate-400 font-medium">단위: 만원</span>
                     </div>
                     <p className="text-xs text-slate-400 mt-1">
-                      프로모션 진행에 따른 반품 급증 및 수수료율 인상 등의 이상 징후를 감지합니다.
+                      {channelFilter === 'ALL' 
+                        ? '전체 채널의 프로모션 진행에 따른 반품 급증 및 수수료율 인상 등의 이상 징후를 감지합니다.' 
+                        : channelFilter === 'COUPANG'
+                        ? '쿠팡 로켓배송의 주차별 수수료 및 반품/클레임 보류 손실 추이를 추적합니다.'
+                        : channelFilter === 'SMARTSTORE'
+                        ? '네이버 스마트스토어의 주차별 네이버페이 수수료 및 취소/환불 추이를 추적합니다.'
+                        : 'B2B 세금계산서 도매 채널의 주차별 손실 추이를 모니터링합니다.'}
                     </p>
                   </div>
 
@@ -1698,8 +1766,8 @@ export default function App() {
                   </div>
 
                   <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                    <span>10월 4주차 반품 손실 증가 추세 감지</span>
-                    <span className="text-rose-600 font-semibold">+37.8% 주간 상승</span>
+                    <span>{currentTrend.insightTitle}</span>
+                    <span className={`font-semibold ${currentTrend.insightColor}`}>{currentTrend.insightValue}</span>
                   </div>
                 </div>
               </div>
