@@ -581,12 +581,21 @@ export default function App() {
     return matchChannel && matchQuery;
   });
 
-  // 거래처별 그룹 아코디언 확장 상태 (기본적으로 네이버, 쿠팡, 알파테크 펼침)
-  const [expandedPartners, setExpandedPartners] = useState<Record<string, boolean>>({
-    '네이버 스마트스토어_SMARTSTORE': true,
-    '쿠팡 로켓배송_COUPANG': true,
-    '(주)알파테크_B2B': true
-  });
+  // 거래처별 그룹 아코디언 확장 상태 (기본: 모두 접힘 상태)
+  const [expandedPartners, setExpandedPartners] = useState<Record<string, boolean>>({});
+
+  // 거래처 테이블 정렬 상태 (기본: 총청구금액 높은 순 내림차순)
+  const [partnerSortField, setPartnerSortField] = useState<'totalGross' | 'unpaidGross' | 'totalCount' | 'companyName'>('totalGross');
+  const [partnerSortOrder, setPartnerSortOrder] = useState<'asc' | 'desc'>('desc');
+
+  const handlePartnerSort = (field: 'totalGross' | 'unpaidGross' | 'totalCount' | 'companyName') => {
+    if (partnerSortField === field) {
+      setPartnerSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
+    } else {
+      setPartnerSortField(field);
+      setPartnerSortOrder('desc');
+    }
+  };
 
   const togglePartnerExpand = (partnerKey: string) => {
     setExpandedPartners(prev => ({
@@ -668,10 +677,21 @@ export default function App() {
     });
 
     return result.sort((a, b) => {
-      if (b.overdueCount !== a.overdueCount) return b.overdueCount - a.overdueCount;
-      return b.totalGross - a.totalGross;
+      let cmp = 0;
+      if (partnerSortField === 'totalGross') {
+        cmp = b.totalGross - a.totalGross;
+      } else if (partnerSortField === 'unpaidGross') {
+        const uncollectedA = a.unpaidGross + a.overdueGross;
+        const uncollectedB = b.unpaidGross + b.overdueGross;
+        cmp = uncollectedB - uncollectedA;
+      } else if (partnerSortField === 'totalCount') {
+        cmp = b.totalCount - a.totalCount;
+      } else if (partnerSortField === 'companyName') {
+        cmp = a.companyName.localeCompare(b.companyName);
+      }
+      return partnerSortOrder === 'desc' ? cmp : -cmp;
     });
-  }, [filteredSales]);
+  }, [filteredSales, partnerSortField, partnerSortOrder]);
 
   const toggleAllPartners = () => {
     const allExpanded = groupedSales.every(g => expandedPartners[g.partnerKey]);
@@ -1689,16 +1709,68 @@ export default function App() {
                 </div>
 
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full text-left text-xs table-fixed">
                     <thead className="bg-[#F8FAFC] text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
                       <tr>
-                        <th className="px-5 py-3 whitespace-nowrap">거래처명</th>
-                        <th className="px-4 py-3 whitespace-nowrap">채널유형</th>
-                        <th className="px-4 py-3 text-center whitespace-nowrap">총주문수</th>
-                        <th className="px-5 py-3 text-right whitespace-nowrap">총청구금액</th>
-                        <th className="px-5 py-3 text-right whitespace-nowrap">미수금액</th>
-                        <th className="px-4 py-3 text-center whitespace-nowrap">종합채권상태</th>
-                        <th className="px-4 py-3 text-center whitespace-nowrap">상세</th>
+                        <th
+                          onClick={() => handlePartnerSort('companyName')}
+                          className="w-[24%] px-5 py-3 cursor-pointer hover:bg-slate-100 transition whitespace-nowrap select-none"
+                          title="클릭하여 거래처명 정렬"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span>거래처명</span>
+                            {partnerSortField === 'companyName' ? (
+                              <span className="text-[#1E40AF] font-bold">{partnerSortOrder === 'desc' ? '▼' : '▲'}</span>
+                            ) : (
+                              <span className="text-slate-300">↕</span>
+                            )}
+                          </div>
+                        </th>
+                        <th className="w-[11%] px-4 py-3 text-center whitespace-nowrap">채널유형</th>
+                        <th
+                          onClick={() => handlePartnerSort('totalCount')}
+                          className="w-[10%] px-4 py-3 text-center cursor-pointer hover:bg-slate-100 transition whitespace-nowrap select-none"
+                          title="클릭하여 총주문수 정렬"
+                        >
+                          <div className="flex items-center justify-center gap-1">
+                            <span>총주문수</span>
+                            {partnerSortField === 'totalCount' ? (
+                              <span className="text-[#1E40AF] font-bold">{partnerSortOrder === 'desc' ? '▼' : '▲'}</span>
+                            ) : (
+                              <span className="text-slate-300">↕</span>
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => handlePartnerSort('totalGross')}
+                          className="w-[17%] px-5 py-3 text-right cursor-pointer hover:bg-slate-100 transition whitespace-nowrap select-none"
+                          title="클릭하여 총청구금액 정렬"
+                        >
+                          <div className="flex items-center justify-end gap-1">
+                            <span>총청구금액</span>
+                            {partnerSortField === 'totalGross' ? (
+                              <span className="text-[#1E40AF] font-bold">{partnerSortOrder === 'desc' ? '▼' : '▲'}</span>
+                            ) : (
+                              <span className="text-slate-300">↕</span>
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => handlePartnerSort('unpaidGross')}
+                          className="w-[17%] px-5 py-3 text-right cursor-pointer hover:bg-slate-100 transition whitespace-nowrap select-none"
+                          title="클릭하여 미수금액 정렬"
+                        >
+                          <div className="flex items-center justify-end gap-1">
+                            <span>미수금액</span>
+                            {partnerSortField === 'unpaidGross' ? (
+                              <span className="text-[#1E40AF] font-bold">{partnerSortOrder === 'desc' ? '▼' : '▲'}</span>
+                            ) : (
+                              <span className="text-slate-300">↕</span>
+                            )}
+                          </div>
+                        </th>
+                        <th className="w-[13%] px-4 py-3 text-center whitespace-nowrap">종합채권상태</th>
+                        <th className="w-[8%] px-4 py-3 text-center whitespace-nowrap">상세</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1727,7 +1799,7 @@ export default function App() {
                             <tr
                               onClick={() => togglePartnerExpand(g.partnerKey)}
                               className={`cursor-pointer transition select-none ${
-                                isExpanded ? 'bg-blue-50/40 hover:bg-blue-50/60' : 'hover:bg-slate-50/80'
+                                isExpanded ? 'bg-blue-50/50 hover:bg-blue-50/70' : 'hover:bg-slate-50/80'
                               }`}
                             >
                               <td className="px-5 py-3.5 whitespace-nowrap">
@@ -1747,7 +1819,7 @@ export default function App() {
                                   </span>
                                 </div>
                               </td>
-                              <td className="px-4 py-3.5 whitespace-nowrap">
+                              <td className="px-4 py-3.5 text-center whitespace-nowrap">
                                 {getChannelBadge(g.channelType)}
                               </td>
                               <td className="px-4 py-3.5 text-center whitespace-nowrap">
@@ -1793,74 +1865,81 @@ export default function App() {
                               </td>
                             </tr>
 
-                            {/* 거래처 클릭 시 펼쳐지는 연계 주문/청구 상세 서브 테이블 */}
+                            {/* 거래처 클릭 시 펼쳐지는 연계 주문/청구 상세 서브 패널 */}
                             {isExpanded && (
-                              <tr className="bg-slate-50/70 border-b border-slate-200/80">
-                                <td colSpan={7} className="p-0">
-                                  <div className="py-3 px-6 pl-10 border-l-4 border-l-[#1E40AF] bg-gradient-to-r from-blue-50/30 via-slate-50/20 to-white">
-                                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/70">
+                              <tr className="bg-slate-50/90 border-y border-slate-200">
+                                <td colSpan={7} className="p-4 sm:p-5">
+                                  <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-4">
+                                    {/* 서브 헤더 배너 */}
+                                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
                                       <div className="flex items-center gap-2">
-                                        <FolderOpen className="w-3.5 h-3.5 text-[#1E40AF]" />
+                                        <div className="w-6 h-6 rounded-lg bg-blue-50 text-[#1E40AF] flex items-center justify-center shrink-0">
+                                          <FolderOpen className="w-3.5 h-3.5" />
+                                        </div>
                                         <span className="font-bold text-xs text-[#0F172A] whitespace-nowrap">
-                                          [{g.companyName}] 연계 개별 주문 ({g.orders.length}건)
+                                          [{g.companyName}] 건별 상세 주문 내역 (총 {g.orders.length}건)
                                         </span>
+                                        {getChannelBadge(g.channelType)}
                                       </div>
-                                      <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                                      <span className="text-[11px] text-slate-400 whitespace-nowrap hidden sm:inline">
                                         매출 인식일 기준 +30일 경과 시 악성 채권으로 분류
                                       </span>
                                     </div>
 
-                                    <table className="w-full text-left text-xs bg-white rounded-xl border border-slate-200/80 overflow-hidden shadow-2xs">
-                                      <thead className="bg-[#F8FAFC] text-slate-500 font-bold border-b border-slate-200 text-[10px]">
-                                        <tr>
-                                          <th className="px-4 py-2 whitespace-nowrap">주문/청구번호</th>
-                                          <th className="px-4 py-2 whitespace-nowrap">매출인식일</th>
-                                          <th className="px-4 py-2 whitespace-nowrap">정산예정일 (+30D)</th>
-                                          <th className="px-4 py-2 text-right whitespace-nowrap">개별 청구 금액</th>
-                                          <th className="px-4 py-2 text-center whitespace-nowrap">건별 채권 상태</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-slate-100">
-                                        {g.orders.map((ord: any) => (
-                                          <tr key={ord.id} className="hover:bg-blue-50/20 transition">
-                                            <td className="px-4 py-2 font-mono font-bold text-[#1E40AF] whitespace-nowrap">
-                                              <div>{ord.order_key}</div>
-                                              {ord.product_name && (
-                                                <div className="text-[11px] font-normal text-slate-500 font-sans">
-                                                  {ord.product_name} {ord.buyer_name ? `(${ord.buyer_name})` : ''}
-                                                </div>
-                                              )}
-                                            </td>
-                                            <td className="px-4 py-2 text-slate-600 font-medium whitespace-nowrap">
-                                              {ord.sales_date}
-                                            </td>
-                                            <td className="px-4 py-2 text-slate-600 font-medium whitespace-nowrap">
-                                              {ord.due_date}
-                                            </td>
-                                            <td className="px-4 py-2 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
-                                              ₩ {Number(ord.gross_amount || 0).toLocaleString()}
-                                            </td>
-                                            <td className="px-4 py-2 text-center whitespace-nowrap">
-                                              {ord.status === 'PAID' && (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
-                                                  🟢 정산 완료
-                                                </span>
-                                              )}
-                                              {ord.status === 'UNPAID' && (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-[#1E40AF] border border-blue-200 whitespace-nowrap">
-                                                  🔵 정상 채권
-                                                </span>
-                                              )}
-                                              {ord.status === 'OVERDUE' && (
-                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
-                                                  🔴 기한 초과 악성 채권
-                                                </span>
-                                              )}
-                                            </td>
+                                    {/* 서브 주문 테이블 */}
+                                    <div className="overflow-x-auto rounded-lg border border-slate-200">
+                                      <table className="w-full text-xs">
+                                        <thead className="bg-[#F8FAFC] text-slate-500 font-bold border-b border-slate-200 text-[11px]">
+                                          <tr>
+                                            <th className="px-4 py-2.5 text-left whitespace-nowrap">주문/청구번호 및 상품명</th>
+                                            <th className="px-4 py-2.5 text-center whitespace-nowrap">매출인식일</th>
+                                            <th className="px-4 py-2.5 text-center whitespace-nowrap">정산예정일 (+30D)</th>
+                                            <th className="px-4 py-2.5 text-right whitespace-nowrap">개별 청구 금액</th>
+                                            <th className="px-4 py-2.5 text-center whitespace-nowrap">건별 채권 상태</th>
                                           </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 bg-white">
+                                          {g.orders.map((ord: any) => (
+                                            <tr key={ord.id} className="hover:bg-blue-50/20 transition">
+                                              <td className="px-4 py-2.5 font-mono font-bold text-[#1E40AF] text-left whitespace-nowrap">
+                                                <div>{ord.order_key}</div>
+                                                {ord.product_name && (
+                                                  <div className="text-[11px] font-normal text-slate-500 font-sans">
+                                                    {ord.product_name} {ord.buyer_name ? `(${ord.buyer_name})` : ''}
+                                                  </div>
+                                                )}
+                                              </td>
+                                              <td className="px-4 py-2.5 text-slate-600 font-medium text-center whitespace-nowrap">
+                                                {ord.sales_date}
+                                              </td>
+                                              <td className="px-4 py-2.5 text-slate-600 font-medium text-center whitespace-nowrap">
+                                                {ord.due_date}
+                                              </td>
+                                              <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                                                ₩ {Number(ord.gross_amount || 0).toLocaleString()}
+                                              </td>
+                                              <td className="px-4 py-2.5 text-center whitespace-nowrap">
+                                                {ord.status === 'PAID' && (
+                                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                                                    🟢 정산 완료
+                                                  </span>
+                                                )}
+                                                {ord.status === 'UNPAID' && (
+                                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-[#1E40AF] border border-blue-200 whitespace-nowrap">
+                                                    🔵 정상 채권
+                                                  </span>
+                                                )}
+                                                {ord.status === 'OVERDUE' && (
+                                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+                                                    🔴 기한 초과 악성 채권
+                                                  </span>
+                                                )}
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
                                   </div>
                                 </td>
                               </tr>
