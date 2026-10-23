@@ -67,8 +67,11 @@ export interface DemoSettlementOrder {
   returnLoss: number;
   damage: number;
   etc: number;
+  expectedSettledAmount?: number;
   settledAmount: number;
-  status: 'MATCHED' | 'RETURN_DEDUCTED' | 'DAMAGE_RETURN';
+  diffAmount?: number;
+  diffReason?: string;
+  status: 'MATCHED' | 'RETURN_DEDUCTED' | 'DAMAGE_RETURN' | 'UNMATCHED_DISPUTE';
 }
 
 // 네이버 스마트스토어 10월 정산 배치 개별 주문 리스트 (8건 합계: 매출 4,500만원 / 공제 270만원 / 실지급 4,230만원)
@@ -287,6 +290,26 @@ export const COUPANG_DEMO_ORDERS: DemoSettlementOrder[] = [
   }
 ];
 
+// 쿠팡 로켓배송 차액 불일치(126만원) 예외 시나리오 주문 리스트
+// (주문 CP-20261012-0205에 고객 반품 클레임 분쟁 보류로 ₩ 1,260,000 미정산 발생)
+export const COUPANG_MISMATCH_DEMO_ORDERS: DemoSettlementOrder[] = COUPANG_DEMO_ORDERS.map(ord => {
+  if (ord.orderKey === 'CP-20261012-0205') {
+    return {
+      ...ord,
+      expectedSettledAmount: 11885000,
+      settledAmount: 10625000,
+      diffAmount: -1260000,
+      diffReason: '고객 반품 클레임 분쟁 보류 (쿠팡 검수 진행 중 ₩ 1,260,000 지급 보류)',
+      status: 'UNMATCHED_DISPUTE'
+    };
+  }
+  return {
+    ...ord,
+    expectedSettledAmount: ord.settledAmount,
+    diffAmount: 0
+  };
+});
+
 // 개별 주문 품목 및 주문자명 메타데이터 매핑
 export const ORDER_METADATA_MAP: Record<string, { product_name: string; buyer_name: string }> = {
   ...NAVER_DEMO_ORDERS.reduce((acc, cur) => {
@@ -455,6 +478,9 @@ export default function App() {
   const [b2cStep, setB2cStep] = useState<number>(1);
   const [b2cReconciled, setB2cReconciled] = useState<boolean>(false);
   const [b2bReconciledIds, setB2bReconciledIds] = useState<string[]>([]);
+  const [checkedOrderKeys, setCheckedOrderKeys] = useState<Record<string, boolean>>({});
+  const [disputeSuccessOrder, setDisputeSuccessOrder] = useState<string | null>(null);
+  const [partialApproved, setPartialApproved] = useState<boolean>(false);
 
   // 4.1 실제 엑셀/CSV 드래그 앤 드롭 업로드 및 파싱 상태
   const [uploadedBankFile, setUploadedBankFile] = useState<{
@@ -2616,6 +2642,9 @@ export default function App() {
                                 setB2cBatch('naver');
                                 setB2cStep(1);
                                 setB2cReconciled(false);
+                                setPartialApproved(false);
+                                setDisputeSuccessOrder(null);
+                                setCheckedOrderKeys({});
                               }}
                               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                                 b2cBatch === 'naver'
@@ -2630,6 +2659,9 @@ export default function App() {
                                 setB2cBatch('coupang_match');
                                 setB2cStep(1);
                                 setB2cReconciled(false);
+                                setPartialApproved(false);
+                                setDisputeSuccessOrder(null);
+                                setCheckedOrderKeys({});
                               }}
                               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                                 b2cBatch === 'coupang_match'
@@ -2644,6 +2676,9 @@ export default function App() {
                                 setB2cBatch('coupang_mismatch');
                                 setB2cStep(1);
                                 setB2cReconciled(false);
+                                setPartialApproved(false);
+                                setDisputeSuccessOrder(null);
+                                setCheckedOrderKeys({});
                               }}
                               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                                 b2cBatch === 'coupang_mismatch'
@@ -2765,54 +2800,35 @@ export default function App() {
                                 </div>
                               </div>
 
-                              {/* 1단계 액션 바 */}
-                              <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
-                                <span className="text-xs text-slate-500">
-                                  {isMatch 
-                                    ? `1단계 금액 대조가 성공적으로 검증되었습니다. 2단계 주문별 상세 분해를 진행할 수 있습니다.`
-                                    : '⚠️ 금액이 일치하지 않습니다. 회계 원칙에 따라 차액을 미확인 가수금 보관함으로 이관해야 합니다.'}
-                                </span>
+                              {/* 1단계 액션 바 (한 줄 정렬) */}
+                              <div className="mt-5 pt-4 border-t border-slate-100 flex flex-wrap md:flex-nowrap items-center justify-between gap-4">
+                                <div className="flex items-center gap-2 text-xs text-slate-600 min-w-0">
+                                  {isMatch ? (
+                                    <>
+                                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                                      <span className="truncate">1단계 덩어리 금액 대조 완료 (오차 0원). 2단계 주문별 상세 분해를 진행할 수 있습니다.</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                                      <span className="truncate">
+                                        통장 실입금액(₩ 75,000,000)과 정산서 총액 간 <strong>₩ 1,260,000 차액</strong> 발생 → 2단계에서 <strong>주문번호별 대사 체크 및 미정산 사유</strong>를 확인하세요.
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
 
-                                {isMatch ? (
-                                  <button
-                                    onClick={() => setB2cStep(2)}
-                                    className="px-5 py-2.5 rounded-xl bg-[#1E40AF] hover:bg-blue-800 text-white font-bold text-xs shadow-md shadow-blue-900/20 transition flex items-center gap-2 active:scale-[0.98]"
-                                  >
-                                    <span>2단계: 주문별 상세 분해 진행</span>
-                                    <ArrowRight className="w-4 h-4" />
-                                  </button>
-                                ) : (
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <button
-                                      onClick={() => setB2cStep(2)}
-                                      className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs transition flex items-center gap-1.5 active:scale-[0.98]"
-                                    >
-                                      <Eye className="w-4 h-4" />
-                                      <span>2단계: 쿠팡 8건 주문 내역 비교 보기</span>
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        const newItem = {
-                                          id: 'sp-coupang-diff',
-                                          sender_name: '쿠팡정산 (차액 발생)',
-                                          amount: 1260000,
-                                          reason: 'UNMATCHED_AMOUNT (지급액 126만원 미달 차액)',
-                                          status: 'PENDING',
-                                          conflict_count: 0
-                                        };
-                                        if (!suspenseList.some(s => s.id === newItem.id)) {
-                                          setSuspenseList(prev => [newItem, ...prev]);
-                                        }
-                                        setActionSuccessMsg(`[가수금 이관 완료] 쿠팡 정산 차액 ₩ 1,260,000이 미확인 보관함(suspense_amounts)으로 성공적으로 이관되었습니다.`);
-                                        setTimeout(() => setActionSuccessMsg(''), 4000);
-                                      }}
-                                      className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-900/20 transition flex items-center gap-2 active:scale-[0.98]"
-                                    >
-                                      <AlertTriangle className="w-4 h-4" />
-                                      <span>차액 ₩ 1,260,000 미확인 가수금으로 이관 & 대사 보류</span>
-                                    </button>
-                                  </div>
-                                )}
+                                <button
+                                  onClick={() => setB2cStep(2)}
+                                  className={`px-5 py-2.5 rounded-xl text-white font-bold text-xs shadow-md transition flex items-center gap-2 shrink-0 active:scale-95 whitespace-nowrap ${
+                                    isMatch
+                                      ? 'bg-[#1E40AF] hover:bg-blue-800 shadow-blue-900/20'
+                                      : 'bg-rose-600 hover:bg-rose-700 shadow-rose-900/20'
+                                  }`}
+                                >
+                                  <span>2단계: 주문번호별 정산 대사 & 차액 사유 확인</span>
+                                  <ArrowRight className="w-4 h-4" />
+                                </button>
                               </div>
                             </div>
                           );
@@ -2822,9 +2838,16 @@ export default function App() {
                         {b2cStep === 2 && (() => {
                           const isMatch = b2cBatch !== 'coupang_mismatch';
                           const batchPlatformName = b2cBatch === 'naver' ? '네이버 스마트스토어' : '쿠팡 로켓배송';
-                          const activeOrders = b2cBatch === 'naver' ? NAVER_DEMO_ORDERS : COUPANG_DEMO_ORDERS;
+                          const activeOrders = b2cBatch === 'naver' 
+                            ? NAVER_DEMO_ORDERS 
+                            : b2cBatch === 'coupang_match' 
+                              ? COUPANG_DEMO_ORDERS 
+                              : COUPANG_MISMATCH_DEMO_ORDERS;
+
                           const totalGross = activeOrders.reduce((acc, cur) => acc + cur.grossAmount, 0);
                           const totalSettled = activeOrders.reduce((acc, cur) => acc + cur.settledAmount, 0);
+                          const totalExpected = activeOrders.reduce((acc, cur) => acc + (cur.expectedSettledAmount || cur.settledAmount), 0);
+                          const totalDiff = activeOrders.reduce((acc, cur) => acc + (cur.diffAmount || 0), 0);
                           const totalFee = activeOrders.reduce((acc, cur) => acc + cur.fee, 0);
                           const totalReturn = activeOrders.reduce((acc, cur) => acc + cur.returnLoss, 0);
                           const totalDamage = activeOrders.reduce((acc, cur) => acc + cur.damage, 0);
@@ -2841,10 +2864,10 @@ export default function App() {
                             if (!matchQuery) return false;
 
                             if (presetOrderFilter === 'DEDUCTED') {
-                              return ord.returnLoss > 0 || ord.damage > 0 || ord.etc > 0;
+                              return ord.returnLoss > 0 || ord.damage > 0 || (ord.diffAmount && ord.diffAmount !== 0);
                             }
                             if (presetOrderFilter === 'NORMAL') {
-                              return ord.returnLoss === 0 && ord.damage === 0 && ord.etc === 0;
+                              return ord.returnLoss === 0 && ord.damage === 0 && (!ord.diffAmount || ord.diffAmount === 0);
                             }
                             return true;
                           });
@@ -2862,7 +2885,7 @@ export default function App() {
                                       2단계 : 주문번호(Order Key) 기준 상세 내역 분해 및 상호 대조
                                     </h3>
                                     <p className="text-xs text-slate-500 mt-0.5">
-                                      {batchPlatformName} 10월 정산 배치 내 {activeOrders.length}건의 개별 주문 원장을 교차 대조하고 공제 내역을 분석합니다.
+                                      {batchPlatformName} 정산 배치 내 {activeOrders.length}건의 개별 주문 건별로 원래 정산 예정액과 실제 지급액을 상호 대사합니다.
                                     </p>
                                   </div>
                                 </div>
@@ -2871,30 +2894,34 @@ export default function App() {
                                     b2cReconciled ? (
                                       <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1.5">
                                         <Check className="w-3.5 h-3.5" />
-                                        대사 및 리스크 DB 동기화 완료
+                                        대사 및 원장 반영 완료
                                       </span>
                                     ) : (
                                       <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-[#1E40AF]">
-                                        {activeOrders.length}건 상세 분해 대기 중
+                                        {activeOrders.length}건 상세 대사 대기 중
                                       </span>
                                     )
                                   ) : (
                                     <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200 flex items-center gap-1.5">
                                       <AlertTriangle className="w-3.5 h-3.5" />
-                                      차액 ₩ 1,260,000 대사 보류
+                                      주문별 차액 점검 (-₩ 1,260,000)
                                     </span>
                                   )}
                                 </div>
                               </div>
 
-                              {/* 쿠팡 차액 발생 경고 안내 배너 */}
+                              {/* 쿠팡 차액 발생 시 주문번호별 점검 안내 배너 */}
                               {b2cBatch === 'coupang_mismatch' && (
-                                <div className="p-4 rounded-xl bg-rose-50/80 border border-rose-200 text-xs text-rose-900 flex items-start gap-3">
-                                  <AlertOctagon className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                                <div className="p-4 rounded-xl bg-amber-50/90 border border-amber-200 text-xs text-amber-900 flex items-start gap-3">
+                                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                                   <div className="leading-relaxed">
-                                    <strong className="font-bold">지급 불일치 경고: </strong>
-                                    쿠팡 정산서상 8건 주문의 실지급 합계는 <strong>₩ {totalSettled.toLocaleString()}</strong>이나, 은행 통장 실입금액은 <strong>₩ 75,000,000</strong>으로 <strong className="text-rose-700">₩ 1,260,000의 미달 차액</strong>이 발생했습니다. 
-                                    회계 부정 방지를 위해 개별 주문 승인이 차단되며, 전액 미확인 가수금으로 이관해야 합니다.
+                                    <div className="font-bold text-sm text-amber-950 mb-0.5">
+                                      주문번호별 정산 대사 점검 (총 8건 중 1건 차액 감지)
+                                    </div>
+                                    <div>
+                                      쿠팡 정산 예정액은 원래 <strong>₩ {totalExpected.toLocaleString()}</strong>이나, 통장에는 <strong>₩ 75,000,000</strong>만 입금되었습니다 (<strong>차액 -₩ 1,260,000</strong>).
+                                      아래 표에서 <strong>주문번호 CP-20261012-0205</strong>의 미정산 사유(고객 반품 클레임 분쟁 보류)를 확인하고, <strong>정상 7건은 개별 승인</strong>, <strong>차액 건은 쿠팡 이의신청</strong>으로 처리하세요.
+                                    </div>
                                   </div>
                                 </div>
                               )}
@@ -2915,14 +2942,16 @@ export default function App() {
                                     <strong className="text-sm text-emerald-600">₩ {totalSettled.toLocaleString()}</strong>
                                   </div>
                                   <div>
-                                    <span className="text-slate-400 block mb-1">총 공제 차액</span>
-                                    <strong className="text-sm text-rose-600">- ₩ {totalDeductions.toLocaleString()}</strong>
+                                    <span className="text-slate-400 block mb-1">총 공제 및 차액</span>
+                                    <strong className="text-sm text-rose-600">
+                                      - ₩ {(totalDeductions + Math.abs(totalDiff)).toLocaleString()}
+                                    </strong>
                                   </div>
                                 </div>
 
                                 <div className="mt-4">
                                   <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-3">
-                                    공제 합계 ₩ {totalDeductions.toLocaleString()} 자동 분해 상세 내역 (Risk Records 적재)
+                                    공제 내역 자동 분해 (수수료 / 반품 / 파손 / 차액)
                                   </span>
 
                                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -2932,21 +2961,18 @@ export default function App() {
                                           <span className="w-2 h-2 rounded-full bg-[#1E40AF]" />
                                           정산수수료 (FEE)
                                         </span>
-                                        <span className="text-slate-400 font-mono">
-                                          {((totalFee / totalGross) * 100).toFixed(1)}%
-                                        </span>
                                       </div>
                                       <div className="text-sm font-bold font-mono text-[#0F172A]">
                                         ₩ {totalFee.toLocaleString()}
                                       </div>
-                                      <p className="text-[10px] text-slate-400 mt-0.5">결제 수수료 및 입점 수수료</p>
+                                      <p className="text-[10px] text-slate-400 mt-0.5">결제 및 플랫폼 입점 수수료</p>
                                     </div>
 
                                     <div className="p-3 rounded-xl bg-[#F8FAFC] border border-slate-200">
                                       <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-1">
                                         <span className="flex items-center gap-1.5">
                                           <span className="w-2 h-2 rounded-full bg-[#DC2626]" />
-                                          반품/취소 (RETURN)
+                                          반품/환불 (RETURN)
                                         </span>
                                         <span className="text-rose-600 font-bold">
                                           {activeOrders.filter(o => o.returnLoss > 0).length}건
@@ -2955,7 +2981,7 @@ export default function App() {
                                       <div className="text-sm font-bold font-mono text-rose-600">
                                         ₩ {totalReturn.toLocaleString()}
                                       </div>
-                                      <p className="text-[10px] text-slate-400 mt-0.5">고객 반품 및 단순 변심 환불</p>
+                                      <p className="text-[10px] text-slate-400 mt-0.5">고객 단순 변심 및 반품 환불</p>
                                     </div>
 
                                     <div className="p-3 rounded-xl bg-[#F8FAFC] border border-slate-200">
@@ -2977,26 +3003,33 @@ export default function App() {
                                     <div className="p-3 rounded-xl bg-[#F8FAFC] border border-slate-200">
                                       <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-1">
                                         <span className="flex items-center gap-1.5">
-                                          <span className="w-2 h-2 rounded-full bg-[#94A3B8]" />
-                                          기타 (ETC)
+                                          <span className="w-2 h-2 rounded-full bg-rose-500" />
+                                          정산 차액 (DISPUTE)
                                         </span>
-                                        <span className="text-slate-400">-</span>
+                                        <span className="text-rose-600 font-bold">
+                                          {activeOrders.filter(o => o.diffAmount && o.diffAmount !== 0).length}건
+                                        </span>
                                       </div>
-                                      <div className="text-sm font-bold font-mono text-slate-400">
-                                        ₩ {totalEtc.toLocaleString()}
+                                      <div className={`text-sm font-bold font-mono ${totalDiff !== 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                                        {totalDiff !== 0 ? `- ₩ ${Math.abs(totalDiff).toLocaleString()}` : '₩ 0'}
                                       </div>
-                                      <p className="text-[10px] text-slate-400 mt-0.5">기타 프로모션 및 분담금</p>
+                                      <p className="text-[10px] text-slate-400 mt-0.5">
+                                        {totalDiff !== 0 ? '클레임 보류로 인한 미지급액' : '오차 없음 (100% 일치)'}
+                                      </p>
                                     </div>
                                   </div>
                                 </div>
                               </div>
 
-                              {/* 개별 주문 비교 대사 테이블 */}
+                              {/* 개별 주문 비교 대사 테이블 (주문번호별 체크 및 차액 사유 분석) */}
                               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
                                 <div className="p-3.5 bg-slate-50/80 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
                                   <div className="flex items-center gap-2">
                                     <span className="font-bold text-slate-800">
-                                      오픈마켓 개별 주문 대사 리스트 ({filteredDemoList.length} / {activeOrders.length}건)
+                                      주문번호별 상세 대사 리스트 ({filteredDemoList.length} / {activeOrders.length}건)
+                                    </span>
+                                    <span className="text-[11px] text-slate-400">
+                                      (주문번호마다 정산 예정액과 실제 지급액을 비교하여 차액 사유를 확인합니다)
                                     </span>
                                   </div>
 
@@ -3033,7 +3066,7 @@ export default function App() {
                                             : 'text-slate-500 hover:text-slate-800'
                                         }`}
                                       >
-                                        차감 발생 ({activeOrders.filter(o => o.returnLoss > 0 || o.damage > 0).length})
+                                        차감/보류 발생 ({activeOrders.filter(o => o.returnLoss > 0 || o.damage > 0 || (o.diffAmount && o.diffAmount !== 0)).length})
                                       </button>
                                       <button
                                         onClick={() => setPresetOrderFilter('NORMAL')}
@@ -3043,108 +3076,154 @@ export default function App() {
                                             : 'text-slate-500 hover:text-slate-800'
                                         }`}
                                       >
-                                        정상 ({activeOrders.filter(o => o.returnLoss === 0 && o.damage === 0).length})
+                                        정상 ({activeOrders.filter(o => o.returnLoss === 0 && o.damage === 0 && (!o.diffAmount || o.diffAmount === 0)).length})
                                       </button>
                                     </div>
                                   </div>
                                 </div>
 
-                                <div className="overflow-x-auto max-h-80">
-                                  <table className="w-full text-left text-xs">
+                                <div className="overflow-x-auto max-h-96">
+                                  <table className="w-full text-left text-xs table-fixed">
+                                    <colgroup>
+                                      <col className="w-10" />
+                                      <col className="w-36" />
+                                      <col className="w-48" />
+                                      <col className="w-28" />
+                                      <col className="w-28" />
+                                      <col className="w-28" />
+                                      <col className="w-28" />
+                                      <col className="w-56" />
+                                    </colgroup>
                                     <thead className="bg-[#F8FAFC] text-slate-500 font-bold border-b border-slate-200 sticky top-0 text-[11px]">
                                       <tr>
-                                        <th className="px-4 py-2.5 whitespace-nowrap">주문번호 / 일자</th>
-                                        <th className="px-4 py-2.5 whitespace-nowrap">상품명 / 주문 고객</th>
-                                        <th className="px-4 py-2.5 text-right whitespace-nowrap">결제금액 (원장)</th>
-                                        <th className="px-4 py-2.5 text-right whitespace-nowrap">정산실지급액</th>
-                                        <th className="px-4 py-2.5 text-right whitespace-nowrap">수수료(FEE)</th>
-                                        <th className="px-4 py-2.5 text-right whitespace-nowrap">반품(RETURN)</th>
-                                        <th className="px-4 py-2.5 text-right whitespace-nowrap">파손(DAMAGE)</th>
-                                        <th className="px-4 py-2.5 text-center whitespace-nowrap">대사 판정</th>
+                                        <th className="px-3 py-2.5 text-center whitespace-nowrap">
+                                          <input
+                                            type="checkbox"
+                                            checked={activeOrders.length > 0 && activeOrders.every(o => checkedOrderKeys[o.orderKey] ?? (!o.diffAmount || o.diffAmount === 0))}
+                                            onChange={(e) => {
+                                              const next: Record<string, boolean> = {};
+                                              activeOrders.forEach(o => { next[o.orderKey] = e.target.checked; });
+                                              setCheckedOrderKeys(next);
+                                            }}
+                                            className="rounded border-slate-300 text-[#1E40AF] focus:ring-0 cursor-pointer"
+                                            title="전체 선택/해제"
+                                          />
+                                        </th>
+                                        <th className="px-3 py-2.5 whitespace-nowrap">주문번호 / 일자</th>
+                                        <th className="px-3 py-2.5 whitespace-nowrap">상품명 / 주문 고객</th>
+                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">원장 결제금액</th>
+                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">정산 예정액</th>
+                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">실제 정산지급액</th>
+                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">정산 차액</th>
+                                        <th className="px-4 py-2.5 text-center whitespace-nowrap">대사 판정 & 미정산 사유</th>
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                      {filteredDemoList.map((ord) => (
-                                        <tr key={ord.orderKey} className="hover:bg-slate-50/80 transition">
-                                          <td className="px-4 py-2.5 font-mono font-bold text-[#1E40AF] whitespace-nowrap">
-                                            <div>{ord.orderKey}</div>
-                                            <div className="text-[10px] text-slate-400 font-sans font-normal">{ord.date}</div>
-                                          </td>
-                                          <td className="px-4 py-2.5 whitespace-nowrap text-slate-900">
-                                            <div className="font-semibold text-xs text-slate-800">{ord.productName}</div>
-                                            <div className="text-[11px] text-slate-400 font-normal">주문자: {ord.customer}</div>
-                                          </td>
-                                          <td className="px-4 py-2.5 text-right font-mono font-semibold text-slate-900 whitespace-nowrap">
-                                            ₩ {ord.grossAmount.toLocaleString()}
-                                          </td>
-                                          <td className="px-4 py-2.5 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
-                                            ₩ {ord.settledAmount.toLocaleString()}
-                                          </td>
-                                          <td className="px-4 py-2.5 text-right font-mono text-[#1E40AF] whitespace-nowrap">
-                                            ₩ {ord.fee.toLocaleString()}
-                                          </td>
-                                          <td className="px-4 py-2.5 text-right font-mono whitespace-nowrap">
-                                            {ord.returnLoss > 0 ? (
-                                              <span className="font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
-                                                - ₩ {ord.returnLoss.toLocaleString()}
-                                              </span>
-                                            ) : (
-                                              <span className="text-slate-400">-</span>
-                                            )}
-                                          </td>
-                                          <td className="px-4 py-2.5 text-right font-mono whitespace-nowrap">
-                                            {ord.damage > 0 ? (
-                                              <span className="font-bold text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">
-                                                - ₩ {ord.damage.toLocaleString()}
-                                              </span>
-                                            ) : (
-                                              <span className="text-slate-400">-</span>
-                                            )}
-                                          </td>
-                                          <td className="px-4 py-2.5 text-center whitespace-nowrap">
-                                            {ord.damage > 0 ? (
-                                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 whitespace-nowrap">
-                                                🔵 파손/반품 차감
-                                              </span>
-                                            ) : ord.returnLoss > 0 ? (
-                                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
-                                                🔴 반품 환불 차감
-                                              </span>
-                                            ) : (
-                                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
-                                                🟢 전액 일치
-                                              </span>
-                                            )}
-                                          </td>
-                                        </tr>
-                                      ))}
+                                      {filteredDemoList.map((ord) => {
+                                        const hasDiff = ord.diffAmount && ord.diffAmount !== 0;
+                                        const expectedAmt = ord.expectedSettledAmount || ord.settledAmount;
+                                        const isChecked = checkedOrderKeys[ord.orderKey] ?? !hasDiff;
+
+                                        return (
+                                          <tr
+                                            key={ord.orderKey}
+                                            className={`transition ${
+                                              hasDiff ? 'bg-rose-50/40 hover:bg-rose-50/70' : 'hover:bg-slate-50/80'
+                                            }`}
+                                          >
+                                            <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                                              <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={(e) => {
+                                                  setCheckedOrderKeys(prev => ({
+                                                    ...prev,
+                                                    [ord.orderKey]: e.target.checked
+                                                  }));
+                                                }}
+                                                className="rounded border-slate-300 text-[#1E40AF] focus:ring-0 cursor-pointer"
+                                              />
+                                            </td>
+                                            <td className="px-3 py-2.5 font-mono font-bold text-[#1E40AF] whitespace-nowrap">
+                                              <div>{ord.orderKey}</div>
+                                              <div className="text-[10px] text-slate-400 font-sans font-normal">{ord.date}</div>
+                                            </td>
+                                            <td className="px-3 py-2.5 whitespace-nowrap text-slate-900 truncate">
+                                              <div className="font-semibold text-xs text-slate-800 truncate" title={ord.productName}>{ord.productName}</div>
+                                              <div className="text-[11px] text-slate-400 font-normal">주문자: {ord.customer}</div>
+                                            </td>
+                                            <td className="px-3 py-2.5 text-right font-mono font-semibold text-slate-900 whitespace-nowrap">
+                                              ₩ {ord.grossAmount.toLocaleString()}
+                                            </td>
+                                            <td className="px-3 py-2.5 text-right font-mono font-semibold text-slate-700 whitespace-nowrap">
+                                              ₩ {expectedAmt.toLocaleString()}
+                                            </td>
+                                            <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
+                                              ₩ {ord.settledAmount.toLocaleString()}
+                                            </td>
+                                            <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap">
+                                              {hasDiff ? (
+                                                <span className="font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                                  - ₩ {Math.abs(ord.diffAmount!).toLocaleString()}
+                                                </span>
+                                              ) : (
+                                                <span className="text-slate-400 font-medium">₩ 0</span>
+                                              )}
+                                            </td>
+                                            <td className="px-4 py-2.5 text-center whitespace-nowrap">
+                                              {hasDiff ? (
+                                                <div className="flex flex-col items-center gap-0.5">
+                                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                                                    ⚠️ 쿠팡 정산 지급 보류
+                                                  </span>
+                                                  <span className="text-[10px] text-rose-700 font-semibold" title={ord.diffReason}>
+                                                    {ord.diffReason}
+                                                  </span>
+                                                </div>
+                                              ) : ord.damage > 0 ? (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 whitespace-nowrap">
+                                                  🔵 파손/반품 차감 후 일치
+                                                </span>
+                                              ) : ord.returnLoss > 0 ? (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+                                                  🔴 반품 환불 차감 후 일치
+                                                </span>
+                                              ) : (
+                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                                                  🟢 전액 일치 확인
+                                                </span>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
                                     </tbody>
                                     <tfoot className="bg-slate-50/90 font-bold border-t border-slate-200 text-slate-800 text-xs">
                                       <tr>
-                                        <td className="px-4 py-2.5 whitespace-nowrap" colSpan={2}>
-                                          합계 ({filteredDemoList.length}건)
+                                        <td className="px-3 py-2.5 text-center whitespace-nowrap">합계</td>
+                                        <td className="px-3 py-2.5 whitespace-nowrap" colSpan={2}>
+                                          {filteredDemoList.length}건 주문 내역
                                         </td>
-                                        <td className="px-4 py-2.5 text-right font-mono whitespace-nowrap">
+                                        <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap">
                                           ₩ {filteredDemoList.reduce((sum, o) => sum + o.grossAmount, 0).toLocaleString()}
                                         </td>
-                                        <td className="px-4 py-2.5 text-right font-mono text-emerald-700 whitespace-nowrap">
+                                        <td className="px-3 py-2.5 text-right font-mono text-slate-700 whitespace-nowrap">
+                                          ₩ {filteredDemoList.reduce((sum, o) => sum + (o.expectedSettledAmount || o.settledAmount), 0).toLocaleString()}
+                                        </td>
+                                        <td className="px-3 py-2.5 text-right font-mono text-emerald-700 whitespace-nowrap">
                                           ₩ {filteredDemoList.reduce((sum, o) => sum + o.settledAmount, 0).toLocaleString()}
                                         </td>
-                                        <td className="px-4 py-2.5 text-right font-mono text-[#1E40AF] whitespace-nowrap">
-                                          ₩ {filteredDemoList.reduce((sum, o) => sum + o.fee, 0).toLocaleString()}
+                                        <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap">
+                                          {totalDiff !== 0 ? (
+                                            <span className="text-rose-600 font-bold">
+                                              - ₩ {Math.abs(totalDiff).toLocaleString()}
+                                            </span>
+                                          ) : (
+                                            <span className="text-slate-400">₩ 0</span>
+                                          )}
                                         </td>
-                                        <td className="px-4 py-2.5 text-right font-mono text-rose-600 whitespace-nowrap">
-                                          {filteredDemoList.reduce((sum, o) => sum + o.returnLoss, 0) > 0 
-                                            ? `- ₩ ${filteredDemoList.reduce((sum, o) => sum + o.returnLoss, 0).toLocaleString()}` 
-                                            : '-'}
-                                        </td>
-                                        <td className="px-4 py-2.5 text-right font-mono text-sky-600 whitespace-nowrap">
-                                          {filteredDemoList.reduce((sum, o) => sum + o.damage, 0) > 0 
-                                            ? `- ₩ ${filteredDemoList.reduce((sum, o) => sum + o.damage, 0).toLocaleString()}` 
-                                            : '-'}
-                                        </td>
-                                        <td className="px-4 py-2.5 text-center text-slate-400 font-normal">
-                                          -
+                                        <td className="px-4 py-2.5 text-center text-slate-500 font-normal">
+                                          {totalDiff !== 0 ? '1건 소명 접수 필요' : '전건 정상 검증됨'}
                                         </td>
                                       </tr>
                                     </tfoot>
@@ -3152,67 +3231,118 @@ export default function App() {
                                 </div>
                               </div>
 
-                              {/* 하단 액션 버튼 */}
-                              <div className="flex items-center justify-between pt-2">
-                                <span className="text-xs text-slate-500">
-                                  {isMatch
-                                    ? `총 ${activeOrders.length}건 주문 내역이 통장 입금액(₩ ${totalSettled.toLocaleString()})과 정확히 부합합니다.`
-                                    : `⚠️ 쿠팡 차액 ₩ 1,260,000이 해소되지 않아 대사 확정이 불가합니다.`}
-                                </span>
-
-                                {isMatch ? (
-                                  <button
-                                    disabled={b2cReconciled || currentRole === 'viewer'}
-                                    onClick={() => {
-                                      setB2cReconciled(true);
-                                      const orderKeys = activeOrders.map(o => o.orderKey);
-                                      setSalesRecords(prev => prev.map(s => orderKeys.includes(s.order_key) ? { ...s, status: 'PAID' } : s));
-                                      
-                                      const newAudit = {
-                                        id: `a-${Date.now()}`,
-                                        action_type: 'AUTO_2STEP_RECONCILE',
-                                        target_id: `${batchPlatformName} (8건)`,
-                                        actor_email: 'system@auto.reconcile',
-                                        actor_role: currentRole,
-                                        memo: `${batchPlatformName} 8개 개별 주문 대사 확정 및 리스크 공제(₩ ${totalDeductions.toLocaleString()}) DB 동기화 완료`,
-                                        amount: totalSettled,
-                                        created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
-                                      };
-                                      setAuditLogs(prev => [newAudit, ...prev]);
-
-                                      setActionSuccessMsg(`[2-Step 대사 완료] ${batchPlatformName} 8개 개별 주문(총 ₩ ${totalGross.toLocaleString()}) 대사가 확정되었으며, 리스크 공제 내역(₩ ${totalDeductions.toLocaleString()})이 Risk DB에 성공적으로 적재되었습니다.`);
-                                      setTimeout(() => setActionSuccessMsg(''), 4500);
-                                    }}
-                                    className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs shadow-md shadow-emerald-900/20 transition flex items-center gap-2 active:scale-[0.98]"
-                                  >
-                                    <CheckCheck className="w-4 h-4" />
+                              {/* 하단 액션 버튼 (정상 건 개별 승인 및 차액 건 쿠팡 소명 접수 분리) */}
+                              <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+                                <div className="text-xs text-slate-600">
+                                  {isMatch ? (
                                     <span>
-                                      {b2cReconciled ? '8건 주문 대사 및 장부 반영 완료됨' : '8건 주문 2-Step 최종 대사 확정 & Risk DB 동기화'}
+                                      총 {activeOrders.length}건 주문이 통장 입금액(₩ {totalSettled.toLocaleString()})과 100% 일치합니다.
                                     </span>
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => {
-                                      const newItem = {
-                                        id: 'sp-coupang-diff',
-                                        sender_name: '쿠팡정산 (차액 발생)',
-                                        amount: 1260000,
-                                        reason: 'UNMATCHED_AMOUNT (지급액 126만원 미달 차액)',
-                                        status: 'PENDING',
-                                        conflict_count: 0
-                                      };
-                                      if (!suspenseList.some(s => s.id === newItem.id)) {
-                                        setSuspenseList(prev => [newItem, ...prev]);
-                                      }
-                                      setActionSuccessMsg(`[가수금 이관 완료] 쿠팡 정산 차액 ₩ 1,260,000이 미확인 보관함(suspense_amounts)으로 성공적으로 이관되었습니다.`);
-                                      setTimeout(() => setActionSuccessMsg(''), 4000);
-                                    }}
-                                    className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-900/20 transition flex items-center gap-2 active:scale-[0.98]"
-                                  >
-                                    <AlertTriangle className="w-4 h-4" />
-                                    <span>차액 ₩ 1,260,000 미확인 가수금으로 이관 & 대사 보류</span>
-                                  </button>
-                                )}
+                                  ) : (
+                                    <span>
+                                      총 {activeOrders.length}건 중 <strong className="text-emerald-700">정상 7건 (₩ 64,375,000)</strong>은 개별 승인하고, <strong className="text-rose-600">보류 1건 (-₩ 1,260,000)</strong>은 쿠팡에 소명 이의신청합니다.
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-3">
+                                  {isMatch ? (
+                                    <button
+                                      disabled={b2cReconciled || currentRole === 'viewer'}
+                                      onClick={() => {
+                                        setB2cReconciled(true);
+                                        const orderKeys = activeOrders.map(o => o.orderKey);
+                                        setSalesRecords(prev => prev.map(s => orderKeys.includes(s.order_key) ? { ...s, status: 'PAID' } : s));
+                                        
+                                        const newAudit = {
+                                          id: `a-${Date.now()}`,
+                                          action_type: 'AUTO_2STEP_RECONCILE',
+                                          target_id: `${batchPlatformName} (8건)`,
+                                          actor_email: 'system@auto.reconcile',
+                                          actor_role: currentRole,
+                                          memo: `${batchPlatformName} 8개 개별 주문 대사 확정 및 리스크 공제(₩ ${totalDeductions.toLocaleString()}) DB 동기화 완료`,
+                                          amount: totalSettled,
+                                          created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+                                        };
+                                        setAuditLogs(prev => [newAudit, ...prev]);
+
+                                        setActionSuccessMsg(`[2-Step 대사 완료] ${batchPlatformName} 8개 개별 주문(총 ₩ ${totalGross.toLocaleString()}) 대사가 확정되었으며, 장부 동기화가 완료되었습니다.`);
+                                        setTimeout(() => setActionSuccessMsg(''), 4500);
+                                      }}
+                                      className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs shadow-md shadow-emerald-900/20 transition flex items-center gap-2 active:scale-[0.98]"
+                                    >
+                                      <CheckCheck className="w-4 h-4" />
+                                      <span>
+                                        {b2cReconciled ? '8건 주문 대사 및 장부 반영 완료됨' : '8건 주문 2-Step 최종 대사 확정'}
+                                      </span>
+                                    </button>
+                                  ) : (
+                                    <>
+                                      <button
+                                        disabled={partialApproved || currentRole === 'viewer'}
+                                        onClick={() => {
+                                          setPartialApproved(true);
+                                          const normalKeys = COUPANG_MISMATCH_DEMO_ORDERS.filter(o => !o.diffAmount || o.diffAmount === 0).map(o => o.orderKey);
+                                          setSalesRecords(prev => prev.map(s => normalKeys.includes(s.order_key) ? { ...s, status: 'PAID' } : s));
+                                          
+                                          const newAudit = {
+                                            id: `a-${Date.now()}`,
+                                            action_type: 'PARTIAL_RECONCILE',
+                                            target_id: '쿠팡 로켓배송 (정상 7건)',
+                                            actor_email: 'finance@manager.corp',
+                                            actor_role: currentRole,
+                                            memo: '쿠팡 10월 정산 중 정상 확인된 7건 개별 주문 대사 확정 승인 (₩ 64,375,000)',
+                                            amount: 64375000,
+                                            created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+                                          };
+                                          setAuditLogs(prev => [newAudit, ...prev]);
+                                          setActionSuccessMsg('[정산 승인 완료] 정상 확인된 7건 주문(₩ 64,375,000)의 대사가 확정되어 원장에 정산 완료 반영되었습니다.');
+                                          setTimeout(() => setActionSuccessMsg(''), 4500);
+                                        }}
+                                        className={`px-5 py-2.5 rounded-xl text-white font-bold text-xs shadow-md transition flex items-center gap-2 active:scale-95 ${
+                                          partialApproved
+                                            ? 'bg-slate-400 cursor-not-allowed'
+                                            : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-900/20'
+                                        }`}
+                                      >
+                                        <CheckCheck className="w-4 h-4" />
+                                        <span>
+                                          {partialApproved ? '정상 7건 대사 승인 완료됨' : '정상 확인 7건 정산 승인 (₩ 64,375,000)'}
+                                        </span>
+                                      </button>
+
+                                      <button
+                                        disabled={disputeSuccessOrder !== null || currentRole === 'viewer'}
+                                        onClick={() => {
+                                          setDisputeSuccessOrder('CP-20261012-0205');
+                                          const newAudit = {
+                                            id: `a-${Date.now()}`,
+                                            action_type: 'COUPANG_DISPUTE_CLAIM',
+                                            target_id: 'CP-20261012-0205',
+                                            actor_email: 'finance@manager.corp',
+                                            actor_role: currentRole,
+                                            memo: '주문 CP-20261012-0205 고객 클레임 분쟁 보류 차액 ₩ 1,260,000 쿠팡 정산센터 소명 요청 및 차기 소급 지급 접수',
+                                            amount: 1260000,
+                                            created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+                                          };
+                                          setAuditLogs(prev => [newAudit, ...prev]);
+                                          setActionSuccessMsg('[쿠팡 소명 접수 완료] 주문번호 CP-20261012-0205 (차액 ₩ 1,260,000) 건에 대해 쿠팡 정산센터에 소명 자료 제출 및 차기 정산 소급 지급 요청이 접수되었습니다.');
+                                          setTimeout(() => setActionSuccessMsg(''), 5000);
+                                        }}
+                                        className={`px-5 py-2.5 rounded-xl text-white font-bold text-xs shadow-md transition flex items-center gap-2 active:scale-95 ${
+                                          disputeSuccessOrder
+                                            ? 'bg-slate-400 cursor-not-allowed'
+                                            : 'bg-amber-600 hover:bg-amber-700 shadow-amber-900/20'
+                                        }`}
+                                      >
+                                        <AlertTriangle className="w-4 h-4" />
+                                        <span>
+                                          {disputeSuccessOrder ? '쿠팡 소명 접수 완료됨' : '주문 CP-20261012-0205 쿠팡 소명/이의신청 (₩ 1,260,000)'}
+                                        </span>
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           );
