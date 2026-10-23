@@ -1710,6 +1710,15 @@ export default function App() {
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs table-fixed">
+                    <colgroup>
+                      <col className="w-[24%]" />
+                      <col className="w-[11%]" />
+                      <col className="w-[10%]" />
+                      <col className="w-[17%]" />
+                      <col className="w-[17%]" />
+                      <col className="w-[13%]" />
+                      <col className="w-[8%]" />
+                    </colgroup>
                     <thead className="bg-[#F8FAFC] text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
                       <tr>
                         <th
@@ -1886,36 +1895,43 @@ export default function App() {
                                       </span>
                                     </div>
 
-                                    {/* 서브 주문 테이블 */}
-                                    <div className="overflow-x-auto rounded-lg border border-slate-200">
-                                      <table className="w-full text-xs">
-                                        <thead className="bg-[#F8FAFC] text-slate-500 font-bold border-b border-slate-200 text-[11px]">
+                                    {/* 서브 주문 테이블 (열 간격 고정 및 세로줄 구분선 적용) */}
+                                    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                      <table className="w-full text-xs table-fixed">
+                                        <colgroup>
+                                          <col className="w-[32%]" />
+                                          <col className="w-[16%]" />
+                                          <col className="w-[18%]" />
+                                          <col className="w-[18%]" />
+                                          <col className="w-[16%]" />
+                                        </colgroup>
+                                        <thead className="bg-[#F8FAFC] text-slate-600 font-bold border-b border-slate-200 text-[11px]">
                                           <tr>
-                                            <th className="px-4 py-2.5 text-left whitespace-nowrap">주문/청구번호 및 상품명</th>
-                                            <th className="px-4 py-2.5 text-center whitespace-nowrap">매출인식일</th>
-                                            <th className="px-4 py-2.5 text-center whitespace-nowrap">정산예정일 (+30D)</th>
-                                            <th className="px-4 py-2.5 text-right whitespace-nowrap">개별 청구 금액</th>
+                                            <th className="px-4 py-2.5 text-left border-r border-slate-200 whitespace-nowrap">주문/청구번호 및 상품명</th>
+                                            <th className="px-4 py-2.5 text-center border-r border-slate-200 whitespace-nowrap">매출인식일</th>
+                                            <th className="px-4 py-2.5 text-center border-r border-slate-200 whitespace-nowrap">정산예정일 (+30D)</th>
+                                            <th className="px-4 py-2.5 text-right border-r border-slate-200 whitespace-nowrap">개별 청구 금액</th>
                                             <th className="px-4 py-2.5 text-center whitespace-nowrap">건별 채권 상태</th>
                                           </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100 bg-white">
                                           {g.orders.map((ord: any) => (
                                             <tr key={ord.id} className="hover:bg-blue-50/20 transition">
-                                              <td className="px-4 py-2.5 font-mono font-bold text-[#1E40AF] text-left whitespace-nowrap">
+                                              <td className="px-4 py-2.5 font-mono font-bold text-[#1E40AF] text-left border-r border-slate-100 whitespace-nowrap truncate">
                                                 <div>{ord.order_key}</div>
                                                 {ord.product_name && (
-                                                  <div className="text-[11px] font-normal text-slate-500 font-sans">
+                                                  <div className="text-[11px] font-normal text-slate-500 font-sans truncate">
                                                     {ord.product_name} {ord.buyer_name ? `(${ord.buyer_name})` : ''}
                                                   </div>
                                                 )}
                                               </td>
-                                              <td className="px-4 py-2.5 text-slate-600 font-medium text-center whitespace-nowrap">
+                                              <td className="px-4 py-2.5 text-slate-600 font-medium text-center border-r border-slate-100 whitespace-nowrap">
                                                 {ord.sales_date}
                                               </td>
-                                              <td className="px-4 py-2.5 text-slate-600 font-medium text-center whitespace-nowrap">
+                                              <td className="px-4 py-2.5 text-slate-600 font-medium text-center border-r border-slate-100 whitespace-nowrap">
                                                 {ord.due_date}
                                               </td>
-                                              <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                                              <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-900 border-r border-slate-100 whitespace-nowrap">
                                                 ₩ {Number(ord.gross_amount || 0).toLocaleString()}
                                               </td>
                                               <td className="px-4 py-2.5 text-center whitespace-nowrap">
