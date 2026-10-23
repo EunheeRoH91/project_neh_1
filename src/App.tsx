@@ -2984,11 +2984,11 @@ export default function App() {
                                   <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                                   <div className="leading-relaxed">
                                     <div className="font-bold text-sm text-amber-950 mb-0.5">
-                                      주문번호별 정산 대사 점검 (총 8건 중 1건 차액 감지)
+                                      주문번호별 정산 대사 점검 (총 8건 중 1건 고객 정산보류 미수금 감지)
                                     </div>
                                     <div>
-                                      정산서상 차감 후 지급되어야 할 금액은 <strong>₩ {(totalSettled + Math.abs(totalDiff)).toLocaleString()}</strong>이나, 통장에는 <strong>₩ 75,000,000</strong>만 입금되었습니다 (<strong>미수 차액 ₩ 1,260,000</strong>).
-                                      아래 표에서 <strong>주문번호 CP-20261012-0205</strong>의 차감 내역 및 보류 사유(고객 반품 클레임 분쟁 보류)를 확인하고, <strong>정상 7건은 정산 승인</strong>, <strong>차액 건은 미수금 확정(영업팀 전달)</strong>으로 처리하세요.
+                                      해당 기간 매출 원장 주문 8건 중 <strong>주문번호 CP-20261012-0205는 고객 정산보류로 인해 정산 엑셀에서 제외(보류)</strong>되었습니다.
+                                      이에 따라 통장에는 차액 <strong>₩ 1,260,000</strong>이 덜 입금되었으므로, <strong>정상 7건은 정산 승인</strong>하고 <strong>보류 1건은 미수금으로 확정하여 영업팀에 사유 확인을 전달</strong>하세요.
                                     </div>
                                   </div>
                                 </div>
@@ -3253,9 +3253,9 @@ export default function App() {
                                               {hasDiff ? (
                                                 <span 
                                                   className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap"
-                                                  title={`사유: ${ord.diffReason}`}
+                                                  title="사유: 고객측 정산보류로 정산 엑셀 미반영 (차액 ₩ 1,260,000 미수금 확정 후 영업팀 사유확인 전달)"
                                                 >
-                                                  ⚠️ 미수금 ₩ 1,260,000 (보류)
+                                                  ⚠️ 고객 정산보류 (미수금 ₩ 1,260,000)
                                                 </span>
                                               ) : ord.damage > 0 ? (
                                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 whitespace-nowrap">
@@ -3401,12 +3401,12 @@ export default function App() {
                                             target_id: 'CP-20261012-0205',
                                             actor_email: 'finance@manager.corp',
                                             actor_role: currentRole,
-                                            memo: '주문 CP-20261012-0205 쿠팡 차액 ₩ 1,260,000 미수금 확정 (영업팀 소명 이관)',
+                                            memo: '주문 CP-20261012-0205 고객 정산보류 확인 (차액 ₩ 1,260,000 미수금 확정 및 영업팀 사유확인 전달)',
                                             amount: 1260000,
                                             created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
                                           };
                                           setAuditLogs(prev => [newAudit, ...prev]);
-                                          setActionSuccessMsg('[미수금 확정 완료] 주문번호 CP-20261012-0205의 차액 ₩ 1,260,000이 미수금으로 확정되었으며, 영업팀 소명 요청 건으로 전달되었습니다.');
+                                          setActionSuccessMsg('[미수금 확정 완료] 고객 정산보류 건(CP-20261012-0205, ₩ 1,260,000)이 미수금으로 확정되었으며, 영업팀에 사유 확인 요청이 전달되었습니다.');
                                           setTimeout(() => setActionSuccessMsg(''), 5000);
                                         }}
                                         className={`px-5 py-2.5 rounded-xl text-white font-bold text-xs shadow-md transition flex items-center gap-2 active:scale-95 ${
