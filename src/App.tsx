@@ -2758,7 +2758,7 @@ export default function App() {
                                   : 'text-slate-500 hover:text-slate-800'
                               }`}
                             >
-                              ⚠️ 쿠팡 로켓배송 정산 (차액 불일치 예외)
+                              ⚠️ 쿠팡 로켓배송 정산 (미정산 1건 발생)
                             </button>
                           </div>
                         </div>
@@ -2837,9 +2837,9 @@ export default function App() {
                                         <AlertOctagon className="w-6 h-6" />
                                       </div>
                                       <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                                        ⚠️ 차액 ₩ 1,260,000 발생
+                                        ⚠️ 미정산 1건 (₩ 1,260,000) 감지
                                       </span>
-                                      <p className="text-[11px] text-rose-600 font-semibold">지급액 미달 (정산 보류)</p>
+                                      <p className="text-[11px] text-rose-600 font-semibold">원장 대비 1건 미정산 (보류)</p>
                                     </div>
                                   )}
                                 </div>
@@ -2884,7 +2884,7 @@ export default function App() {
                                     <>
                                       <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
                                       <span className="truncate">
-                                        통장 실입금액(₩ 75,000,000)과 정산서 총액 간 <strong>₩ 1,260,000 차액</strong> 발생 → 2단계에서 <strong>주문번호별 대사 체크 및 미정산 사유</strong>를 확인하세요.
+                                        통장 입금액(₩ 75,000,000) 대비 <strong>미정산 1건 (₩ 1,260,000)</strong> 감지 → 2단계에서 <strong>정산 안 된 주문건과 사유(내역없음)</strong>를 확인하세요.
                                       </span>
                                     </>
                                   )}
@@ -2898,7 +2898,7 @@ export default function App() {
                                       : 'bg-rose-600 hover:bg-rose-700 shadow-rose-900/20'
                                   }`}
                                 >
-                                  <span>2단계: 주문번호별 정산 대사 & 차액 사유 확인</span>
+                                  <span>2단계: 주문번호별 매칭 & 미정산 주문 확인</span>
                                   <ArrowRight className="w-4 h-4" />
                                 </button>
                               </div>
@@ -2976,23 +2976,24 @@ export default function App() {
                                   ) : (
                                     <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200 flex items-center gap-1.5">
                                       <AlertTriangle className="w-3.5 h-3.5" />
-                                      주문별 차액 점검 (-₩ 1,260,000)
+                                      미정산 1건 감지 (-₩ 1,260,000)
                                     </span>
                                   )}
                                 </div>
                               </div>
 
-                              {/* 쿠팡 차액 발생 시 주문번호별 점검 안내 배너 */}
+                              {/* 쿠팡 미정산 발생 시 주문번호별 점검 안내 배너 */}
                               {b2cBatch === 'coupang_mismatch' && (
                                 <div className="p-4 rounded-xl bg-amber-50/90 border border-amber-200 text-xs text-amber-900 flex items-start gap-3">
                                   <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                                   <div className="leading-relaxed">
                                     <div className="font-bold text-sm text-amber-950 mb-0.5">
-                                      주문번호별 정산 대사 점검 (총 8건 중 1건 고객 정산보류 미수금 감지)
+                                      주문번호별 정산 대사 점검 (총 8건 중 1건 미정산 주문 감지)
                                     </div>
                                     <div>
-                                      해당 기간 매출 원장 주문 8건 중 <strong>주문번호 CP-20261012-0205는 고객 정산보류로 인해 정산 엑셀에서 제외(보류)</strong>되었습니다.
-                                      이에 따라 통장에는 차액 <strong>₩ 1,260,000</strong>이 덜 입금되었으므로, <strong>정상 7건은 정산 승인</strong>하고 <strong>보류 1건은 미수금으로 확정하여 영업팀에 사유 확인을 전달</strong>하세요.
+                                      정상 정산 주문은 <strong>[원금액 = 실금액 + 수수료 등 차감액]</strong>으로 100% 일치합니다.  
+                                      다만 이 기간에 원장에 들어온 주문 8건 중 <strong>주문번호 CP-20261012-0205(₩ 1,260,000)는 고객 정산보류로 엑셀에 내역이 없어 미정산(실금액 ₩ 0)</strong>되었습니다.  
+                                      ➔ <strong>정상 7건(₩ 75,000,000)은 정산 승인</strong>하고, <strong>미정산 1건은 미수금으로 확정하여 영업팀에 사유 확인을 전달</strong>하세요.
                                     </div>
                                   </div>
                                 </div>
@@ -3014,7 +3015,7 @@ export default function App() {
                                     <strong className="text-sm text-emerald-600">₩ {totalSettled.toLocaleString()}</strong>
                                   </div>
                                   <div>
-                                    <span className="text-slate-400 block mb-1">총 공제 및 차액</span>
+                                    <span className="text-slate-400 block mb-1">총 공제 및 미정산액</span>
                                     <strong className="text-sm text-rose-600">
                                       - ₩ {(totalDeductions + Math.abs(totalDiff)).toLocaleString()}
                                     </strong>
@@ -3023,7 +3024,7 @@ export default function App() {
 
                                 <div className="mt-4">
                                   <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-3">
-                                    공제 내역 자동 분해 (수수료 / 반품 / 파손 / 차액)
+                                    공제 및 미정산 내역 자동 분해 (수수료 / 반품 / 파손 / 미정산)
                                   </span>
 
                                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -3076,7 +3077,7 @@ export default function App() {
                                       <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-1">
                                         <span className="flex items-center gap-1.5">
                                           <span className="w-2 h-2 rounded-full bg-rose-500" />
-                                          정산 차액 (DISPUTE)
+                                          미정산 주문 (HOLD)
                                         </span>
                                         <span className="text-rose-600 font-bold">
                                           {activeOrders.filter(o => o.diffAmount && o.diffAmount !== 0).length}건
@@ -3086,7 +3087,7 @@ export default function App() {
                                         {totalDiff !== 0 ? `- ₩ ${Math.abs(totalDiff).toLocaleString()}` : '₩ 0'}
                                       </div>
                                       <p className="text-[10px] text-slate-400 mt-0.5">
-                                        {totalDiff !== 0 ? '클레임 보류로 인한 미지급액' : '오차 없음 (100% 일치)'}
+                                        {totalDiff !== 0 ? '고객 정산보류로 엑셀 미반영' : '오차 없음 (전건 정산됨)'}
                                       </p>
                                     </div>
                                   </div>
@@ -3159,13 +3160,12 @@ export default function App() {
                                     <colgroup>
                                       <col className="w-10" />
                                       <col className="w-36" />
-                                      <col className="w-44" />
-                                      <col className="w-24" />
-                                      <col className="w-24" />
-                                      <col className="w-24" />
-                                      <col className="w-24" />
-                                      <col className="w-24" />
-                                      <col className="w-44" />
+                                      <col className="w-48" />
+                                      <col className="w-28" />
+                                      <col className="w-28" />
+                                      <col className="w-28" />
+                                      <col className="w-28" />
+                                      <col className="w-52" />
                                     </colgroup>
                                     <thead className="bg-[#F8FAFC] text-slate-500 font-bold border-b border-slate-200 sticky top-0 text-[11px]">
                                       <tr>
@@ -3184,12 +3184,11 @@ export default function App() {
                                         </th>
                                         <th className="px-3 py-2.5 whitespace-nowrap">주문번호 / 일자</th>
                                         <th className="px-3 py-2.5 whitespace-nowrap">상품명 / 주문 고객</th>
-                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">원장 결제금액</th>
+                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">결제금액 (원금액)</th>
                                         <th className="px-3 py-2.5 text-right whitespace-nowrap">수수료 차감</th>
                                         <th className="px-3 py-2.5 text-right whitespace-nowrap">환불/반품 차감</th>
-                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">실제 정산금액</th>
-                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">미수/보류</th>
-                                        <th className="px-4 py-2.5 text-center whitespace-nowrap">대사 판정</th>
+                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">실제 정산금액 (실금액)</th>
+                                        <th className="px-4 py-2.5 text-center whitespace-nowrap">정산 상태 & 사유</th>
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -3247,16 +3246,7 @@ export default function App() {
                                                   ₩ {ord.settledAmount.toLocaleString()}
                                                 </span>
                                               ) : (
-                                                <span className="text-slate-400 font-mono">₩ 0</span>
-                                              )}
-                                            </td>
-                                            <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap">
-                                              {hasDiff ? (
-                                                <span className="font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                                                  - ₩ {Math.abs(ord.diffAmount!).toLocaleString()}
-                                                </span>
-                                              ) : (
-                                                <span className="text-slate-300">₩ 0</span>
+                                                <span className="text-slate-400 font-mono font-medium">₩ 0</span>
                                               )}
                                             </td>
                                             <td className="px-4 py-2.5 text-center whitespace-nowrap">
@@ -3265,7 +3255,7 @@ export default function App() {
                                                   className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap"
                                                   title="사유: 내역없음 (고객 정산보류로 정산 엑셀에 미포함되어 조회가 안 됨)"
                                                 >
-                                                  ⚠️ 내역없음 (정산보류)
+                                                  ⚠️ 미정산 (내역없음)
                                                 </span>
                                               ) : ord.damage > 0 ? (
                                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 whitespace-nowrap">
@@ -3277,7 +3267,7 @@ export default function App() {
                                                 </span>
                                               ) : (
                                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
-                                                  🟢 전액 정상 정산
+                                                  🟢 전액 정산 완료
                                                 </span>
                                               )}
                                             </td>
@@ -3303,17 +3293,8 @@ export default function App() {
                                         <td className="px-3 py-2.5 text-right font-mono text-emerald-700 whitespace-nowrap">
                                           ₩ {filteredDemoList.reduce((sum, o) => sum + o.settledAmount, 0).toLocaleString()}
                                         </td>
-                                        <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap">
-                                          {totalDiff !== 0 ? (
-                                            <span className="text-rose-600 font-bold">
-                                              - ₩ {Math.abs(totalDiff).toLocaleString()}
-                                            </span>
-                                          ) : (
-                                            <span className="text-slate-300">₩ 0</span>
-                                          )}
-                                        </td>
                                         <td className="px-4 py-2.5 text-center text-slate-500 font-normal whitespace-nowrap">
-                                          {totalDiff !== 0 ? '1건 미수금 확정 필요' : '전건 정상 검증됨'}
+                                          {totalDiff !== 0 ? '7건 정산 완료 / 1건 미정산' : '전건 정상 정산 완료'}
                                         </td>
                                       </tr>
                                     </tfoot>
