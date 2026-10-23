@@ -3172,14 +3172,12 @@ export default function App() {
                                             </td>
                                             <td className="px-4 py-2.5 text-center whitespace-nowrap">
                                               {hasDiff ? (
-                                                <div className="flex flex-col items-center gap-0.5">
-                                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
-                                                    ⚠️ 쿠팡 정산 지급 보류
-                                                  </span>
-                                                  <span className="text-[10px] text-rose-700 font-semibold" title={ord.diffReason}>
-                                                    {ord.diffReason}
-                                                  </span>
-                                                </div>
+                                                <span 
+                                                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap"
+                                                  title={`사유: ${ord.diffReason}`}
+                                                >
+                                                  ⚠️ 미수금 ₩ 1,260,000 (보류)
+                                                </span>
                                               ) : ord.damage > 0 ? (
                                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 whitespace-nowrap">
                                                   🔵 파손/반품 차감 후 일치
@@ -3222,8 +3220,8 @@ export default function App() {
                                             <span className="text-slate-400">₩ 0</span>
                                           )}
                                         </td>
-                                        <td className="px-4 py-2.5 text-center text-slate-500 font-normal">
-                                          {totalDiff !== 0 ? '1건 소명 접수 필요' : '전건 정상 검증됨'}
+                                        <td className="px-4 py-2.5 text-center text-slate-500 font-normal whitespace-nowrap">
+                                          {totalDiff !== 0 ? '1건 미수금 확정 필요' : '전건 정상 검증됨'}
                                         </td>
                                       </tr>
                                     </tfoot>
@@ -3231,7 +3229,7 @@ export default function App() {
                                 </div>
                               </div>
 
-                              {/* 하단 액션 버튼 (정상 건 개별 승인 및 차액 건 쿠팡 소명 접수 분리) */}
+                              {/* 하단 액션 버튼 (정상 건 개별 승인 및 차액 건 미수금 확정/영업팀 전달) */}
                               <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
                                 <div className="text-xs text-slate-600">
                                   {isMatch ? (
@@ -3240,7 +3238,7 @@ export default function App() {
                                     </span>
                                   ) : (
                                     <span>
-                                      총 {activeOrders.length}건 중 <strong className="text-emerald-700">정상 7건 (₩ 64,375,000)</strong>은 개별 승인하고, <strong className="text-rose-600">보류 1건 (-₩ 1,260,000)</strong>은 쿠팡에 소명 이의신청합니다.
+                                      총 {activeOrders.length}건 중 <strong className="text-emerald-700">정상 7건 (₩ 64,375,000)</strong>은 개별 승인하고, <strong className="text-rose-600">차액 1건 (-₩ 1,260,000)</strong>은 미수금으로 확정하여 영업팀에 이관합니다.
                                     </span>
                                   )}
                                 </div>
@@ -3317,27 +3315,27 @@ export default function App() {
                                           setDisputeSuccessOrder('CP-20261012-0205');
                                           const newAudit = {
                                             id: `a-${Date.now()}`,
-                                            action_type: 'COUPANG_DISPUTE_CLAIM',
+                                            action_type: 'AR_MISMATCH_RECORD',
                                             target_id: 'CP-20261012-0205',
                                             actor_email: 'finance@manager.corp',
                                             actor_role: currentRole,
-                                            memo: '주문 CP-20261012-0205 고객 클레임 분쟁 보류 차액 ₩ 1,260,000 쿠팡 정산센터 소명 요청 및 차기 소급 지급 접수',
+                                            memo: '주문 CP-20261012-0205 쿠팡 차액 ₩ 1,260,000 미수금 확정 (영업팀 소명 이관)',
                                             amount: 1260000,
                                             created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
                                           };
                                           setAuditLogs(prev => [newAudit, ...prev]);
-                                          setActionSuccessMsg('[쿠팡 소명 접수 완료] 주문번호 CP-20261012-0205 (차액 ₩ 1,260,000) 건에 대해 쿠팡 정산센터에 소명 자료 제출 및 차기 정산 소급 지급 요청이 접수되었습니다.');
+                                          setActionSuccessMsg('[미수금 확정 완료] 주문번호 CP-20261012-0205의 차액 ₩ 1,260,000이 미수금으로 확정되었으며, 영업팀 소명 요청 건으로 전달되었습니다.');
                                           setTimeout(() => setActionSuccessMsg(''), 5000);
                                         }}
                                         className={`px-5 py-2.5 rounded-xl text-white font-bold text-xs shadow-md transition flex items-center gap-2 active:scale-95 ${
                                           disputeSuccessOrder
                                             ? 'bg-slate-400 cursor-not-allowed'
-                                            : 'bg-amber-600 hover:bg-amber-700 shadow-amber-900/20'
+                                            : 'bg-rose-600 hover:bg-rose-700 shadow-rose-900/20'
                                         }`}
                                       >
                                         <AlertTriangle className="w-4 h-4" />
                                         <span>
-                                          {disputeSuccessOrder ? '쿠팡 소명 접수 완료됨' : '주문 CP-20261012-0205 쿠팡 소명/이의신청 (₩ 1,260,000)'}
+                                          {disputeSuccessOrder ? '미수금 확정 및 영업팀 전달 완료' : '차액 1건(₩ 1,260,000) 미수금 확정 (영업팀 전달)'}
                                         </span>
                                       </button>
                                     </>
