@@ -182,19 +182,19 @@ export const NAVER_DEMO_ORDERS: DemoSettlementOrder[] = [
   }
 ];
 
-// 쿠팡 로켓배송 10월 정산 배치 개별 주문 리스트 (8건 합계: 매출 8,200만원 / 공제 574만원 / 정산실지급 7,626만원 ↔ 통장실입금 7,500만원 차액발생)
+// 쿠팡 로켓배송 10월 정산 배치 개별 주문 리스트 (8건 합계: 매출 8,126만원 / 공제 490만원 / 정산실지급 7,626만원 ↔ 미수 발생 시 통장실입금 7,500만원)
 export const COUPANG_DEMO_ORDERS: DemoSettlementOrder[] = [
   {
     orderKey: 'CP-20261010-0201',
     date: '2026-10-10',
     productName: '로켓 프레시 대용량 공기청정기 필터 세트',
     customer: '송*진',
-    grossAmount: 14000000,
-    fee: 770000,
+    grossAmount: 14500000,
+    fee: 725000,
     returnLoss: 0,
     damage: 0,
     etc: 0,
-    settledAmount: 13230000,
+    settledAmount: 13775000,
     status: 'MATCHED'
   },
   {
@@ -202,12 +202,12 @@ export const COUPANG_DEMO_ORDERS: DemoSettlementOrder[] = [
     date: '2026-10-10',
     productName: '초경량 카본 삼각대 프로 페셔널 패키지',
     customer: '한*수',
-    grossAmount: 12000000,
-    fee: 660000,
-    returnLoss: 340000,
+    grossAmount: 13000000,
+    fee: 650000,
+    returnLoss: 500000,
     damage: 0,
     etc: 0,
-    settledAmount: 11000000,
+    settledAmount: 11850000,
     status: 'RETURN_DEDUCTED'
   },
   {
@@ -215,12 +215,12 @@ export const COUPANG_DEMO_ORDERS: DemoSettlementOrder[] = [
     date: '2026-10-11',
     productName: '4K 방송용 스트리밍 웹캠 마이크 세트',
     customer: '오*영',
-    grossAmount: 9000000,
-    fee: 495000,
+    grossAmount: 11000000,
+    fee: 550000,
     returnLoss: 0,
     damage: 0,
     etc: 0,
-    settledAmount: 8505000,
+    settledAmount: 10450000,
     status: 'MATCHED'
   },
   {
@@ -228,12 +228,12 @@ export const COUPANG_DEMO_ORDERS: DemoSettlementOrder[] = [
     date: '2026-10-11',
     productName: '초고속 대용량 보조배터리 30000mAh 65W',
     customer: '신*호',
-    grossAmount: 11000000,
-    fee: 605000,
-    returnLoss: 500000,
+    grossAmount: 12000000,
+    fee: 600000,
+    returnLoss: 400000,
     damage: 0,
     etc: 0,
-    settledAmount: 9895000,
+    settledAmount: 11000000,
     status: 'RETURN_DEDUCTED'
   },
   {
@@ -241,25 +241,25 @@ export const COUPANG_DEMO_ORDERS: DemoSettlementOrder[] = [
     date: '2026-10-12',
     productName: '고음질 블루투스 스튜디오 모니터 스피커 페어',
     customer: '문*태',
-    grossAmount: 13000000,
-    fee: 715000,
-    returnLoss: 400000,
+    grossAmount: 1260000,
+    fee: 0,
+    returnLoss: 0,
     damage: 0,
     etc: 0,
-    settledAmount: 11885000,
-    status: 'RETURN_DEDUCTED'
+    settledAmount: 1260000,
+    status: 'MATCHED'
   },
   {
     orderKey: 'CP-20261012-0206',
     date: '2026-10-12',
     productName: '마그네틱 고속 무선충전 3in1 스탠드 패드',
     customer: '권*나',
-    grossAmount: 8000000,
-    fee: 440000,
+    grossAmount: 10000000,
+    fee: 500000,
     returnLoss: 0,
     damage: 0,
     etc: 0,
-    settledAmount: 7560000,
+    settledAmount: 9500000,
     status: 'MATCHED'
   },
   {
@@ -267,12 +267,12 @@ export const COUPANG_DEMO_ORDERS: DemoSettlementOrder[] = [
     date: '2026-10-13',
     productName: '인체공학 전동 모션데스크 컨트롤러 세트',
     customer: '황*재',
-    grossAmount: 7500000,
-    fee: 412500,
+    grossAmount: 10000000,
+    fee: 500000,
     returnLoss: 0,
     damage: 0,
     etc: 0,
-    settledAmount: 7087500,
+    settledAmount: 9500000,
     status: 'MATCHED'
   },
   {
@@ -280,26 +280,30 @@ export const COUPANG_DEMO_ORDERS: DemoSettlementOrder[] = [
     date: '2026-10-13',
     productName: 'USB-C 올인원 멀티포트 허브 프로페셔널',
     customer: '배*윤',
-    grossAmount: 7500000,
-    fee: 402500,
+    grossAmount: 9400000,
+    fee: 475000,
     returnLoss: 0,
     damage: 0,
     etc: 0,
-    settledAmount: 7097500,
+    settledAmount: 8925000,
     status: 'MATCHED'
   }
 ];
 
 // 쿠팡 로켓배송 차액 불일치(126만원) 예외 시나리오 주문 리스트
-// (주문 CP-20261012-0205에 고객 반품 클레임 분쟁 보류로 ₩ 1,260,000 미정산 발생)
+// (주문 CP-20261012-0205는 원장에는 조회되나 고객 정산보류로 쿠팡 정산 엑셀에 내역없음 - 126만원 전액 미수금 발생)
 export const COUPANG_MISMATCH_DEMO_ORDERS: DemoSettlementOrder[] = COUPANG_DEMO_ORDERS.map(ord => {
   if (ord.orderKey === 'CP-20261012-0205') {
     return {
       ...ord,
-      expectedSettledAmount: 11885000,
-      settledAmount: 10625000,
+      fee: 0,
+      returnLoss: 0,
+      damage: 0,
+      etc: 0,
+      expectedSettledAmount: 1260000,
+      settledAmount: 0,
       diffAmount: -1260000,
-      diffReason: '고객 반품 클레임 분쟁 보류 (쿠팡 검수 진행 중 ₩ 1,260,000 지급 보류)',
+      diffReason: '내역없음',
       status: 'UNMATCHED_DISPUTE'
     };
   }
@@ -3226,7 +3230,7 @@ export default function App() {
                                               ₩ {ord.grossAmount.toLocaleString()}
                                             </td>
                                             <td className="px-3 py-2.5 text-right font-mono text-slate-500 whitespace-nowrap">
-                                              - ₩ {ord.fee.toLocaleString()}
+                                              {ord.fee > 0 ? `- ₩ ${ord.fee.toLocaleString()}` : <span className="text-slate-300">-</span>}
                                             </td>
                                             <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap">
                                               {refundAmount > 0 ? (
@@ -3237,8 +3241,14 @@ export default function App() {
                                                 <span className="text-slate-300">-</span>
                                               )}
                                             </td>
-                                            <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
-                                              ₩ {ord.settledAmount.toLocaleString()}
+                                            <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap">
+                                              {ord.settledAmount > 0 ? (
+                                                <span className="font-bold text-emerald-700">
+                                                  ₩ {ord.settledAmount.toLocaleString()}
+                                                </span>
+                                              ) : (
+                                                <span className="text-slate-400 font-mono">₩ 0</span>
+                                              )}
                                             </td>
                                             <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap">
                                               {hasDiff ? (
@@ -3253,9 +3263,9 @@ export default function App() {
                                               {hasDiff ? (
                                                 <span 
                                                   className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap"
-                                                  title="사유: 고객측 정산보류로 정산 엑셀 미반영 (차액 ₩ 1,260,000 미수금 확정 후 영업팀 사유확인 전달)"
+                                                  title="사유: 내역없음 (고객 정산보류로 정산 엑셀에 미포함되어 조회가 안 됨)"
                                                 >
-                                                  ⚠️ 고객 정산보류 (미수금 ₩ 1,260,000)
+                                                  ⚠️ 내역없음 (정산보류)
                                                 </span>
                                               ) : ord.damage > 0 ? (
                                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 whitespace-nowrap">
@@ -3320,7 +3330,7 @@ export default function App() {
                                     </span>
                                   ) : (
                                     <span>
-                                      총 {activeOrders.length}건 중 <strong className="text-emerald-700">정상 7건 (₩ 64,375,000)</strong>은 개별 승인하고, <strong className="text-rose-600">차액 1건 (-₩ 1,260,000)</strong>은 미수금으로 확정하여 영업팀에 이관합니다.
+                                      총 {activeOrders.length}건 중 <strong className="text-emerald-700">정상 7건 (₩ 75,000,000)</strong>은 개별 승인하고, <strong className="text-rose-600">내역없음 1건 (-₩ 1,260,000)</strong>은 미수금으로 확정하여 영업팀에 이관합니다.
                                     </span>
                                   )}
                                 </div>
@@ -3371,12 +3381,12 @@ export default function App() {
                                             target_id: '쿠팡 로켓배송 (정상 7건)',
                                             actor_email: 'finance@manager.corp',
                                             actor_role: currentRole,
-                                            memo: '쿠팡 10월 정산 중 정상 확인된 7건 개별 주문 대사 확정 승인 (₩ 64,375,000)',
-                                            amount: 64375000,
+                                            memo: '쿠팡 10월 정산 중 정상 확인된 7건 개별 주문 대사 확정 승인 (₩ 75,000,000)',
+                                            amount: 75000000,
                                             created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
                                           };
                                           setAuditLogs(prev => [newAudit, ...prev]);
-                                          setActionSuccessMsg('[정산 승인 완료] 정상 확인된 7건 주문(₩ 64,375,000)의 대사가 확정되어 원장에 정산 완료 반영되었습니다.');
+                                          setActionSuccessMsg('[정산 승인 완료] 정상 확인된 7건 주문(₩ 75,000,000)의 대사가 확정되어 원장에 정산 완료 반영되었습니다.');
                                           setTimeout(() => setActionSuccessMsg(''), 4500);
                                         }}
                                         className={`px-5 py-2.5 rounded-xl text-white font-bold text-xs shadow-md transition flex items-center gap-2 active:scale-95 ${
@@ -3387,7 +3397,7 @@ export default function App() {
                                       >
                                         <CheckCheck className="w-4 h-4" />
                                         <span>
-                                          {partialApproved ? '정상 7건 대사 승인 완료됨' : '정상 확인 7건 정산 승인 (₩ 64,375,000)'}
+                                          {partialApproved ? '정상 7건 대사 승인 완료됨' : '정상 확인 7건 정산 승인 (₩ 75,000,000)'}
                                         </span>
                                       </button>
 
@@ -3401,12 +3411,12 @@ export default function App() {
                                             target_id: 'CP-20261012-0205',
                                             actor_email: 'finance@manager.corp',
                                             actor_role: currentRole,
-                                            memo: '주문 CP-20261012-0205 고객 정산보류 확인 (차액 ₩ 1,260,000 미수금 확정 및 영업팀 사유확인 전달)',
+                                            memo: '주문 CP-20261012-0205 정산 엑셀 내역없음(고객 정산보류) 확인 (차액 ₩ 1,260,000 미수금 확정 및 영업팀 사유확인 전달)',
                                             amount: 1260000,
                                             created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
                                           };
                                           setAuditLogs(prev => [newAudit, ...prev]);
-                                          setActionSuccessMsg('[미수금 확정 완료] 고객 정산보류 건(CP-20261012-0205, ₩ 1,260,000)이 미수금으로 확정되었으며, 영업팀에 사유 확인 요청이 전달되었습니다.');
+                                          setActionSuccessMsg('[미수금 확정 완료] 엑셀 내역없음 건(CP-20261012-0205, ₩ 1,260,000)이 미수채권으로 확정되었으며, 영업팀에 사유 확인 요청이 전달되었습니다.');
                                           setTimeout(() => setActionSuccessMsg(''), 5000);
                                         }}
                                         className={`px-5 py-2.5 rounded-xl text-white font-bold text-xs shadow-md transition flex items-center gap-2 active:scale-95 ${
@@ -3417,7 +3427,7 @@ export default function App() {
                                       >
                                         <AlertTriangle className="w-4 h-4" />
                                         <span>
-                                          {disputeSuccessOrder ? '미수금 확정 및 영업팀 전달 완료' : '차액 1건(₩ 1,260,000) 미수금 확정 (영업팀 전달)'}
+                                          {disputeSuccessOrder ? '미수금 확정 및 영업팀 전달 완료' : '내역없음 1건(₩ 1,260,000) 미수금 확정 (영업팀 전달)'}
                                         </span>
                                       </button>
                                     </>
