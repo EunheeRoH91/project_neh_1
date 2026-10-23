@@ -2758,22 +2758,22 @@ export default function App() {
                                   : 'text-slate-500 hover:text-slate-800'
                               }`}
                             >
-                              ⚠️ 쿠팡 로켓배송 정산 (정산내역없음 1건 발생)
+                              ⚠️ 쿠팡 로켓배송 정산 (기간 주문 8건 중 미정산 1건 확인)
                             </button>
                           </div>
                         </div>
 
                         {/* STEP 1: 덩어리 금액 대조 */}
                         {(() => {
-                          const isMatch = b2cBatch !== 'coupang_mismatch';
                           const batchPlatformName = b2cBatch === 'naver' ? '네이버 스마트스토어' : '쿠팡 로켓배송';
                           const batchSenderName = b2cBatch === 'naver' ? '네이버페이 정산' : '쿠팡_정산지급';
                           const batchAccount = b2cBatch === 'naver' ? '기업은행 010-1234-5678' : '하나은행 220-456-78901';
                           const batchDate = b2cBatch === 'naver' ? '2026-10-20' : '2026-10-22';
                           const batchBankDeposit = b2cBatch === 'naver' ? 42300000 : b2cBatch === 'coupang_match' ? 76260000 : 75000000;
-                          const batchGross = b2cBatch === 'naver' ? 45000000 : 82000000;
+                          const batchGross = b2cBatch === 'naver' ? 45000000 : b2cBatch === 'coupang_match' ? 82000000 : 80740000;
                           const batchDeduction = b2cBatch === 'naver' ? 2700000 : 5740000;
-                          const batchPayout = b2cBatch === 'naver' ? 42300000 : 76260000;
+                          const batchPayout = b2cBatch === 'naver' ? 42300000 : b2cBatch === 'coupang_match' ? 76260000 : 75000000;
+                          const isMatch = batchBankDeposit === batchPayout;
 
                           return (
                             <div className="border border-slate-200 rounded-2xl p-6 bg-white shadow-2xs">
@@ -2829,7 +2829,7 @@ export default function App() {
                                       <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                         🟢 덩어리 금액 100% 일치
                                       </span>
-                                      <p className="text-[11px] text-slate-400">오차 ₩ 0 (검증 성공)</p>
+                                      <p className="text-[11px] text-slate-400">오차 ₩ 0 (통장 실입금 ↔ 정산 엑셀 일치)</p>
                                     </div>
                                   ) : (
                                     <div className="space-y-2">
@@ -2837,9 +2837,9 @@ export default function App() {
                                         <AlertOctagon className="w-6 h-6" />
                                       </div>
                                       <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                                        ⚠️ 기간대비 미정산 1건 (₩ 1,260,000) 감지
+                                        ⚠️ 정산 파일 불일치 (차액 ₩ {Math.abs(batchBankDeposit - batchPayout).toLocaleString()})
                                       </span>
-                                      <p className="text-[11px] text-rose-600 font-semibold">기간대비 미정산건 확인</p>
+                                      <p className="text-[11px] text-rose-600 font-semibold">다른 정산 파일이거나 지급액 불일치</p>
                                     </div>
                                   )}
                                 </div>
@@ -2878,13 +2878,15 @@ export default function App() {
                                   {isMatch ? (
                                     <>
                                       <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                                      <span className="truncate">1단계 덩어리 금액 대조 완료 (오차 0원). 2단계 주문별 상세 분해를 진행할 수 있습니다.</span>
+                                      <span className="truncate">
+                                        1단계 통장 입금액과 정산 엑셀 실지급액이 ₩ {batchBankDeposit.toLocaleString()}으로 100% 일치합니다. 2단계 주문별 대사를 진행하세요.
+                                      </span>
                                     </>
                                   ) : (
                                     <>
                                       <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
                                       <span className="truncate">
-                                        통장 입금액(₩ 75,000,000) 대비 <strong>기간대비 미정산건 확인 (1건, ₩ 1,260,000)</strong> → 2단계에서 해당 주문건을 확인하고 영업팀으로 이관하세요.
+                                        통장 입금액과 정산 엑셀 실지급액 불일치 (차액 ₩ {Math.abs(batchBankDeposit - batchPayout).toLocaleString()}) → 다른 정산 파일인지 확인하세요.
                                       </span>
                                     </>
                                   )}
@@ -2898,7 +2900,7 @@ export default function App() {
                                       : 'bg-rose-600 hover:bg-rose-700 shadow-rose-900/20'
                                   }`}
                                 >
-                                  <span>2단계: 주문번호별 매칭 & 미정산 주문 확인</span>
+                                  <span>2단계: 주문번호별 매칭 & 미정산 확인</span>
                                   <ArrowRight className="w-4 h-4" />
                                 </button>
                               </div>
@@ -2908,13 +2910,13 @@ export default function App() {
 
                         {/* STEP 2: 상세 내역 분해 매칭 (네이버 / 쿠팡) */}
                         {b2cStep === 2 && (() => {
-                          const isMatch = b2cBatch !== 'coupang_mismatch';
                           const batchPlatformName = b2cBatch === 'naver' ? '네이버 스마트스토어' : '쿠팡 로켓배송';
                           const activeOrders = b2cBatch === 'naver' 
                             ? NAVER_DEMO_ORDERS 
                             : b2cBatch === 'coupang_match' 
                               ? COUPANG_DEMO_ORDERS 
                               : COUPANG_MISMATCH_DEMO_ORDERS;
+                          const hasMissingOrder = activeOrders.some(ord => ord.diffAmount !== 0);
 
                           const totalGross = activeOrders.reduce((acc, cur) => acc + cur.grossAmount, 0);
                           const totalSettled = activeOrders.reduce((acc, cur) => acc + cur.settledAmount, 0);
@@ -2962,28 +2964,26 @@ export default function App() {
                                   </div>
                                 </div>
                                 <div>
-                                  {isMatch ? (
-                                    b2cReconciled ? (
-                                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1.5">
-                                        <Check className="w-3.5 h-3.5" />
-                                        대사 및 원장 반영 완료
-                                      </span>
-                                    ) : (
-                                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-[#1E40AF]">
-                                        {activeOrders.length}건 상세 대사 대기 중
-                                      </span>
-                                    )
-                                  ) : (
+                                  {hasMissingOrder ? (
                                     <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200 flex items-center gap-1.5">
                                       <AlertTriangle className="w-3.5 h-3.5" />
                                       기간대비 미정산 1건 확인 (-₩ 1,260,000)
+                                    </span>
+                                  ) : b2cReconciled ? (
+                                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1.5">
+                                      <Check className="w-3.5 h-3.5" />
+                                      대사 및 원장 반영 완료
+                                    </span>
+                                  ) : (
+                                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-[#1E40AF]">
+                                      {activeOrders.length}건 상세 대사 대기 중
                                     </span>
                                   )}
                                 </div>
                               </div>
 
                               {/* 쿠팡 미정산 발생 시 주문번호별 점검 안내 배너 */}
-                              {b2cBatch === 'coupang_mismatch' && (
+                              {hasMissingOrder && (
                                 <div className="p-4 rounded-xl bg-amber-50/90 border border-amber-200 text-xs text-amber-900 flex items-start gap-3">
                                   <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                                   <div className="leading-relaxed">
@@ -2991,8 +2991,9 @@ export default function App() {
                                       주문번호별 정산 대사 점검 (기간대비 미정산건 확인)
                                     </div>
                                     <div>
-                                      정상 정산 주문은 <strong>[원금액 = 실금액 + 공제액]</strong>으로 100% 일치합니다.  
-                                      다만 <strong>주문번호 CP-20261012-0205(₩ 1,260,000)는 기간대비 미정산건 확인(정산내역없음, 실금액 ₩ 0)</strong>으로 확인되어 영업팀으로 이관 처리합니다.
+                                      1단계 통장 입금액(₩ {totalSettled.toLocaleString()})은 정산 엑셀(7건) 실지급액과 100% 일치합니다.  
+                                      다만 기간 내 당사 주문 원장(8건)과 대조 결과, <strong>주문번호 CP-20261012-0205(₩ 1,260,000)는 정산 엑셀에 내역이 없어 기간대비 미정산건(실금액 ₩ 0)</strong>으로 확인되었습니다.  
+                                      ➔ <strong>정상 7건(₩ 75,000,000)은 정산 승인</strong>하고, <strong>미정산 1건은 영업팀으로 이관</strong> 처리합니다.
                                     </div>
                                   </div>
                                 </div>
@@ -3303,7 +3304,7 @@ export default function App() {
                               {/* 하단 액션 버튼 (정상 건 개별 승인 및 차액 건 미수금 확정/영업팀 전달) */}
                               <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
                                 <div className="text-xs text-slate-600">
-                                  {isMatch ? (
+                                  {!hasMissingOrder ? (
                                     <span>
                                       총 {activeOrders.length}건 주문이 통장 입금액(₩ {totalSettled.toLocaleString()})과 100% 일치합니다.
                                     </span>
@@ -3315,7 +3316,7 @@ export default function App() {
                                 </div>
 
                                 <div className="flex flex-wrap items-center gap-3">
-                                  {isMatch ? (
+                                  {!hasMissingOrder ? (
                                     <button
                                       disabled={b2cReconciled || currentRole === 'viewer'}
                                       onClick={() => {
