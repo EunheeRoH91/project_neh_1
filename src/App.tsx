@@ -2919,8 +2919,8 @@ export default function App() {
                                       주문번호별 정산 대사 점검 (총 8건 중 1건 차액 감지)
                                     </div>
                                     <div>
-                                      쿠팡 정산 예정액은 원래 <strong>₩ {totalExpected.toLocaleString()}</strong>이나, 통장에는 <strong>₩ 75,000,000</strong>만 입금되었습니다 (<strong>차액 -₩ 1,260,000</strong>).
-                                      아래 표에서 <strong>주문번호 CP-20261012-0205</strong>의 미정산 사유(고객 반품 클레임 분쟁 보류)를 확인하고, <strong>정상 7건은 개별 승인</strong>, <strong>차액 건은 쿠팡 이의신청</strong>으로 처리하세요.
+                                      정산서상 차감 후 지급되어야 할 금액은 <strong>₩ {(totalSettled + Math.abs(totalDiff)).toLocaleString()}</strong>이나, 통장에는 <strong>₩ 75,000,000</strong>만 입금되었습니다 (<strong>미수 차액 ₩ 1,260,000</strong>).
+                                      아래 표에서 <strong>주문번호 CP-20261012-0205</strong>의 차감 내역 및 보류 사유(고객 반품 클레임 분쟁 보류)를 확인하고, <strong>정상 7건은 정산 승인</strong>, <strong>차액 건은 미수금 확정(영업팀 전달)</strong>으로 처리하세요.
                                     </div>
                                   </div>
                                 </div>
@@ -3089,7 +3089,7 @@ export default function App() {
                                       <col className="w-36" />
                                       <col className="w-48" />
                                       <col className="w-28" />
-                                      <col className="w-28" />
+                                      <col className="w-32" />
                                       <col className="w-28" />
                                       <col className="w-28" />
                                       <col className="w-56" />
@@ -3112,16 +3112,16 @@ export default function App() {
                                         <th className="px-3 py-2.5 whitespace-nowrap">주문번호 / 일자</th>
                                         <th className="px-3 py-2.5 whitespace-nowrap">상품명 / 주문 고객</th>
                                         <th className="px-3 py-2.5 text-right whitespace-nowrap">원장 결제금액</th>
-                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">정산 예정액</th>
+                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">공제/차감액 (수수료 등)</th>
                                         <th className="px-3 py-2.5 text-right whitespace-nowrap">실제 정산지급액</th>
-                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">정산 차액</th>
+                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">미수/차액</th>
                                         <th className="px-4 py-2.5 text-center whitespace-nowrap">대사 판정 & 미정산 사유</th>
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                       {filteredDemoList.map((ord) => {
                                         const hasDiff = ord.diffAmount && ord.diffAmount !== 0;
-                                        const expectedAmt = ord.expectedSettledAmount || ord.settledAmount;
+                                        const totalOrderDeduction = ord.fee + ord.returnLoss + ord.damage + ord.etc;
                                         const isChecked = checkedOrderKeys[ord.orderKey] ?? !hasDiff;
 
                                         return (
@@ -3155,8 +3155,8 @@ export default function App() {
                                             <td className="px-3 py-2.5 text-right font-mono font-semibold text-slate-900 whitespace-nowrap">
                                               ₩ {ord.grossAmount.toLocaleString()}
                                             </td>
-                                            <td className="px-3 py-2.5 text-right font-mono font-semibold text-slate-700 whitespace-nowrap">
-                                              ₩ {expectedAmt.toLocaleString()}
+                                            <td className="px-3 py-2.5 text-right font-mono font-semibold text-slate-500 whitespace-nowrap" title={`수수료: ₩ ${ord.fee.toLocaleString()}${ord.returnLoss ? ` | 반품: ₩ ${ord.returnLoss.toLocaleString()}` : ''}${ord.damage ? ` | 파손: ₩ ${ord.damage.toLocaleString()}` : ''}`}>
+                                              - ₩ {totalOrderDeduction.toLocaleString()}
                                             </td>
                                             <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
                                               ₩ {ord.settledAmount.toLocaleString()}
@@ -3205,8 +3205,8 @@ export default function App() {
                                         <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap">
                                           ₩ {filteredDemoList.reduce((sum, o) => sum + o.grossAmount, 0).toLocaleString()}
                                         </td>
-                                        <td className="px-3 py-2.5 text-right font-mono text-slate-700 whitespace-nowrap">
-                                          ₩ {filteredDemoList.reduce((sum, o) => sum + (o.expectedSettledAmount || o.settledAmount), 0).toLocaleString()}
+                                        <td className="px-3 py-2.5 text-right font-mono text-slate-500 whitespace-nowrap">
+                                          - ₩ {filteredDemoList.reduce((sum, o) => sum + (o.fee + o.returnLoss + o.damage + o.etc), 0).toLocaleString()}
                                         </td>
                                         <td className="px-3 py-2.5 text-right font-mono text-emerald-700 whitespace-nowrap">
                                           ₩ {filteredDemoList.reduce((sum, o) => sum + o.settledAmount, 0).toLocaleString()}
