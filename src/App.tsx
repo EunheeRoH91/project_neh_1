@@ -36,7 +36,8 @@ import {
   Trash2,
   FileCheck,
   Play,
-  Table
+  Table,
+  Eye
 } from 'lucide-react';
 import { 
   PieChart, 
