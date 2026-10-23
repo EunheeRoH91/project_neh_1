@@ -2882,10 +2882,10 @@ export default function App() {
                                   </span>
                                   <div>
                                     <h3 className="font-bold text-sm text-[#0F172A]">
-                                      2단계 : 주문번호(Order Key) 기준 상세 내역 분해 및 상호 대조
+                                      2단계 : 주문번호(Order Key) 기준 상세 매칭 (환불 여부 및 실정산액 확인)
                                     </h3>
                                     <p className="text-xs text-slate-500 mt-0.5">
-                                      {batchPlatformName} 정산 배치 내 {activeOrders.length}건의 개별 주문 건별로 원래 정산 예정액과 실제 지급액을 상호 대사합니다.
+                                      통장 총액 확인 후, {batchPlatformName} 정산 엑셀 내 주문번호별로 환불/반품 발생 여부와 실제 정산된 금액을 대조·확인합니다.
                                     </p>
                                   </div>
                                 </div>
@@ -3087,12 +3087,13 @@ export default function App() {
                                     <colgroup>
                                       <col className="w-10" />
                                       <col className="w-36" />
-                                      <col className="w-48" />
-                                      <col className="w-28" />
-                                      <col className="w-32" />
-                                      <col className="w-28" />
-                                      <col className="w-28" />
-                                      <col className="w-56" />
+                                      <col className="w-44" />
+                                      <col className="w-24" />
+                                      <col className="w-24" />
+                                      <col className="w-24" />
+                                      <col className="w-24" />
+                                      <col className="w-24" />
+                                      <col className="w-44" />
                                     </colgroup>
                                     <thead className="bg-[#F8FAFC] text-slate-500 font-bold border-b border-slate-200 sticky top-0 text-[11px]">
                                       <tr>
@@ -3112,16 +3113,17 @@ export default function App() {
                                         <th className="px-3 py-2.5 whitespace-nowrap">주문번호 / 일자</th>
                                         <th className="px-3 py-2.5 whitespace-nowrap">상품명 / 주문 고객</th>
                                         <th className="px-3 py-2.5 text-right whitespace-nowrap">원장 결제금액</th>
-                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">공제/차감액 (수수료 등)</th>
-                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">실제 정산지급액</th>
-                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">미수/차액</th>
-                                        <th className="px-4 py-2.5 text-center whitespace-nowrap">대사 판정 & 미정산 사유</th>
+                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">수수료 차감</th>
+                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">환불/반품 차감</th>
+                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">실제 정산금액</th>
+                                        <th className="px-3 py-2.5 text-right whitespace-nowrap">미수/보류</th>
+                                        <th className="px-4 py-2.5 text-center whitespace-nowrap">대사 판정</th>
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                       {filteredDemoList.map((ord) => {
                                         const hasDiff = ord.diffAmount && ord.diffAmount !== 0;
-                                        const totalOrderDeduction = ord.fee + ord.returnLoss + ord.damage + ord.etc;
+                                        const refundAmount = ord.returnLoss + ord.damage;
                                         const isChecked = checkedOrderKeys[ord.orderKey] ?? !hasDiff;
 
                                         return (
@@ -3155,8 +3157,17 @@ export default function App() {
                                             <td className="px-3 py-2.5 text-right font-mono font-semibold text-slate-900 whitespace-nowrap">
                                               ₩ {ord.grossAmount.toLocaleString()}
                                             </td>
-                                            <td className="px-3 py-2.5 text-right font-mono font-semibold text-slate-500 whitespace-nowrap" title={`수수료: ₩ ${ord.fee.toLocaleString()}${ord.returnLoss ? ` | 반품: ₩ ${ord.returnLoss.toLocaleString()}` : ''}${ord.damage ? ` | 파손: ₩ ${ord.damage.toLocaleString()}` : ''}`}>
-                                              - ₩ {totalOrderDeduction.toLocaleString()}
+                                            <td className="px-3 py-2.5 text-right font-mono text-slate-500 whitespace-nowrap">
+                                              - ₩ {ord.fee.toLocaleString()}
+                                            </td>
+                                            <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap">
+                                              {refundAmount > 0 ? (
+                                                <span className="font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                                  - ₩ {refundAmount.toLocaleString()}
+                                                </span>
+                                              ) : (
+                                                <span className="text-slate-300">-</span>
+                                              )}
                                             </td>
                                             <td className="px-3 py-2.5 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
                                               ₩ {ord.settledAmount.toLocaleString()}
@@ -3167,7 +3178,7 @@ export default function App() {
                                                   - ₩ {Math.abs(ord.diffAmount!).toLocaleString()}
                                                 </span>
                                               ) : (
-                                                <span className="text-slate-400 font-medium">₩ 0</span>
+                                                <span className="text-slate-300">₩ 0</span>
                                               )}
                                             </td>
                                             <td className="px-4 py-2.5 text-center whitespace-nowrap">
@@ -3180,15 +3191,15 @@ export default function App() {
                                                 </span>
                                               ) : ord.damage > 0 ? (
                                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 whitespace-nowrap">
-                                                  🔵 파손/반품 차감 후 일치
+                                                  🔵 파손 차감 정산
                                                 </span>
                                               ) : ord.returnLoss > 0 ? (
                                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
-                                                  🔴 반품 환불 차감 후 일치
+                                                  🔴 반품/환불 차감 정산
                                                 </span>
                                               ) : (
                                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
-                                                  🟢 전액 일치 확인
+                                                  🟢 전액 정상 정산
                                                 </span>
                                               )}
                                             </td>
@@ -3206,7 +3217,10 @@ export default function App() {
                                           ₩ {filteredDemoList.reduce((sum, o) => sum + o.grossAmount, 0).toLocaleString()}
                                         </td>
                                         <td className="px-3 py-2.5 text-right font-mono text-slate-500 whitespace-nowrap">
-                                          - ₩ {filteredDemoList.reduce((sum, o) => sum + (o.fee + o.returnLoss + o.damage + o.etc), 0).toLocaleString()}
+                                          - ₩ {filteredDemoList.reduce((sum, o) => sum + o.fee, 0).toLocaleString()}
+                                        </td>
+                                        <td className="px-3 py-2.5 text-right font-mono text-rose-600 whitespace-nowrap">
+                                          - ₩ {filteredDemoList.reduce((sum, o) => sum + (o.returnLoss + o.damage), 0).toLocaleString()}
                                         </td>
                                         <td className="px-3 py-2.5 text-right font-mono text-emerald-700 whitespace-nowrap">
                                           ₩ {filteredDemoList.reduce((sum, o) => sum + o.settledAmount, 0).toLocaleString()}
@@ -3217,7 +3231,7 @@ export default function App() {
                                               - ₩ {Math.abs(totalDiff).toLocaleString()}
                                             </span>
                                           ) : (
-                                            <span className="text-slate-400">₩ 0</span>
+                                            <span className="text-slate-300">₩ 0</span>
                                           )}
                                         </td>
                                         <td className="px-4 py-2.5 text-center text-slate-500 font-normal whitespace-nowrap">
