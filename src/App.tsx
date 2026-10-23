@@ -290,8 +290,8 @@ export const COUPANG_DEMO_ORDERS: DemoSettlementOrder[] = [
   }
 ];
 
-// 쿠팡 로켓배송 차액 불일치(126만원) 예외 시나리오 주문 리스트
-// (주문 CP-20261012-0205는 원장에는 조회되나 고객 정산보류로 쿠팡 정산 엑셀에 내역없음 - 126만원 전액 미수금 발생)
+// 쿠팡 로켓배송 정산내역없음(126만원) 예외 시나리오 주문 리스트
+// (주문 CP-20261012-0205는 정산 엑셀에 내역없음 - 미수금 발생 및 영업팀 이관)
 export const COUPANG_MISMATCH_DEMO_ORDERS: DemoSettlementOrder[] = COUPANG_DEMO_ORDERS.map(ord => {
   if (ord.orderKey === 'CP-20261012-0205') {
     return {
@@ -303,7 +303,7 @@ export const COUPANG_MISMATCH_DEMO_ORDERS: DemoSettlementOrder[] = COUPANG_DEMO_
       expectedSettledAmount: 1260000,
       settledAmount: 0,
       diffAmount: -1260000,
-      diffReason: '내역없음',
+      diffReason: '정산내역없음',
       status: 'UNMATCHED_DISPUTE'
     };
   }
@@ -2758,7 +2758,7 @@ export default function App() {
                                   : 'text-slate-500 hover:text-slate-800'
                               }`}
                             >
-                              ⚠️ 쿠팡 로켓배송 정산 (미정산 1건 발생)
+                              ⚠️ 쿠팡 로켓배송 정산 (정산내역없음 1건 발생)
                             </button>
                           </div>
                         </div>
@@ -2884,7 +2884,7 @@ export default function App() {
                                     <>
                                       <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
                                       <span className="truncate">
-                                        통장 입금액(₩ 75,000,000) 대비 <strong>미정산 1건 (₩ 1,260,000)</strong> 감지 → 2단계에서 <strong>정산 안 된 주문건과 사유(내역없음)</strong>를 확인하세요.
+                                        통장 입금액(₩ 75,000,000) 대비 <strong>정산내역없음 1건 (₩ 1,260,000)</strong> 감지 → 2단계에서 해당 주문건을 확인하고 영업팀으로 이관하세요.
                                       </span>
                                     </>
                                   )}
@@ -2988,12 +2988,11 @@ export default function App() {
                                   <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                                   <div className="leading-relaxed">
                                     <div className="font-bold text-sm text-amber-950 mb-0.5">
-                                      주문번호별 정산 대사 점검 (총 8건 중 1건 미정산 주문 감지)
+                                      주문번호별 정산 대사 점검 (총 8건 중 1건 정산내역없음 감지)
                                     </div>
                                     <div>
-                                      정상 정산 주문은 <strong>[원금액 = 실금액 + 수수료 등 차감액]</strong>으로 100% 일치합니다.  
-                                      다만 이 기간에 원장에 들어온 주문 8건 중 <strong>주문번호 CP-20261012-0205(₩ 1,260,000)는 고객 정산보류로 엑셀에 내역이 없어 미정산(실금액 ₩ 0)</strong>되었습니다.  
-                                      ➔ <strong>정상 7건(₩ 75,000,000)은 정산 승인</strong>하고, <strong>미정산 1건은 미수금으로 확정하여 영업팀에 사유 확인을 전달</strong>하세요.
+                                      정상 정산 주문은 <strong>[원금액 = 실금액 + 공제액]</strong>으로 100% 일치합니다.  
+                                      다만 <strong>주문번호 CP-20261012-0205(₩ 1,260,000)는 정산내역없음(실금액 ₩ 0)</strong>으로 확인되어 영업팀으로 이관(미수금 확정) 처리합니다.
                                     </div>
                                   </div>
                                 </div>
@@ -3087,7 +3086,7 @@ export default function App() {
                                         {totalDiff !== 0 ? `- ₩ ${Math.abs(totalDiff).toLocaleString()}` : '₩ 0'}
                                       </div>
                                       <p className="text-[10px] text-slate-400 mt-0.5">
-                                        {totalDiff !== 0 ? '고객 정산보류로 엑셀 미반영' : '오차 없음 (전건 정산됨)'}
+                                        {totalDiff !== 0 ? '정산내역없음 (영업팀 이관)' : '오차 없음 (전건 정산됨)'}
                                       </p>
                                     </div>
                                   </div>
@@ -3253,9 +3252,8 @@ export default function App() {
                                               {hasDiff ? (
                                                 <span 
                                                   className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap"
-                                                  title="사유: 내역없음 (고객 정산보류로 정산 엑셀에 미포함되어 조회가 안 됨)"
                                                 >
-                                                  ⚠️ 미정산 (내역없음)
+                                                  ⚠️ 정산내역없음 (영업팀 이관)
                                                 </span>
                                               ) : ord.damage > 0 ? (
                                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 whitespace-nowrap">
@@ -3311,7 +3309,7 @@ export default function App() {
                                     </span>
                                   ) : (
                                     <span>
-                                      총 {activeOrders.length}건 중 <strong className="text-emerald-700">정상 7건 (₩ 75,000,000)</strong>은 개별 승인하고, <strong className="text-rose-600">내역없음 1건 (-₩ 1,260,000)</strong>은 미수금으로 확정하여 영업팀에 이관합니다.
+                                      총 {activeOrders.length}건 중 <strong className="text-emerald-700">정상 7건 (₩ 75,000,000)</strong>은 개별 승인하고, <strong className="text-rose-600">정산내역없음 1건 (-₩ 1,260,000)</strong>은 영업팀으로 이관합니다.
                                     </span>
                                   )}
                                 </div>
@@ -3392,12 +3390,12 @@ export default function App() {
                                             target_id: 'CP-20261012-0205',
                                             actor_email: 'finance@manager.corp',
                                             actor_role: currentRole,
-                                            memo: '주문 CP-20261012-0205 정산 엑셀 내역없음(고객 정산보류) 확인 (차액 ₩ 1,260,000 미수금 확정 및 영업팀 사유확인 전달)',
+                                            memo: '주문 CP-20261012-0205 정산내역없음 확인 (영업팀 이관)',
                                             amount: 1260000,
                                             created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
                                           };
                                           setAuditLogs(prev => [newAudit, ...prev]);
-                                          setActionSuccessMsg('[미수금 확정 완료] 엑셀 내역없음 건(CP-20261012-0205, ₩ 1,260,000)이 미수채권으로 확정되었으며, 영업팀에 사유 확인 요청이 전달되었습니다.');
+                                          setActionSuccessMsg('[영업팀 이관 완료] 정산내역없음 건(CP-20261012-0205, ₩ 1,260,000)이 영업팀으로 정상 이관되었습니다.');
                                           setTimeout(() => setActionSuccessMsg(''), 5000);
                                         }}
                                         className={`px-5 py-2.5 rounded-xl text-white font-bold text-xs shadow-md transition flex items-center gap-2 active:scale-95 ${
@@ -3408,7 +3406,7 @@ export default function App() {
                                       >
                                         <AlertTriangle className="w-4 h-4" />
                                         <span>
-                                          {disputeSuccessOrder ? '미수금 확정 및 영업팀 전달 완료' : '내역없음 1건(₩ 1,260,000) 미수금 확정 (영업팀 전달)'}
+                                          {disputeSuccessOrder ? '영업팀 이관 완료' : '정산내역없음 1건(₩ 1,260,000) 영업팀 이관'}
                                         </span>
                                       </button>
                                     </>
