@@ -55,26 +55,261 @@ import { supabase } from './lib/supabaseClient';
 
 export type UserRole = 'admin' | 'executive' | 'viewer';
 
+// 오픈마켓 정산 배치용 개별 주문 데이터 규격
+export interface DemoSettlementOrder {
+  orderKey: string;
+  date: string;
+  productName: string;
+  customer: string;
+  grossAmount: number;
+  fee: number;
+  returnLoss: number;
+  damage: number;
+  etc: number;
+  settledAmount: number;
+  status: 'MATCHED' | 'RETURN_DEDUCTED' | 'DAMAGE_RETURN';
+}
+
+// 네이버 스마트스토어 10월 정산 배치 개별 주문 리스트 (8건 합계: 매출 4,500만원 / 공제 270만원 / 실지급 4,230만원)
+export const NAVER_DEMO_ORDERS: DemoSettlementOrder[] = [
+  {
+    orderKey: 'ORD-20261015-0101',
+    date: '2026-10-15',
+    productName: '프리미엄 무선 노이즈캔슬링 헤드셋 Gen2',
+    customer: '이*훈',
+    grossAmount: 8500000,
+    fee: 340000,
+    returnLoss: 0,
+    damage: 0,
+    etc: 0,
+    settledAmount: 8160000,
+    status: 'MATCHED'
+  },
+  {
+    orderKey: 'ORD-20261015-0102',
+    date: '2026-10-15',
+    productName: '기계식 핫스왑 게이밍 키보드 RGB (청축)',
+    customer: '박*준',
+    grossAmount: 6200000,
+    fee: 248000,
+    returnLoss: 250000,
+    damage: 0,
+    etc: 0,
+    settledAmount: 5702000,
+    status: 'RETURN_DEDUCTED'
+  },
+  {
+    orderKey: 'ORD-20261015-0103',
+    date: '2026-10-15',
+    productName: '초고속 100W GaN 4포트 멀티충전기',
+    customer: '최*민',
+    grossAmount: 4800000,
+    fee: 192000,
+    returnLoss: 0,
+    damage: 0,
+    etc: 0,
+    settledAmount: 4608000,
+    status: 'MATCHED'
+  },
+  {
+    orderKey: 'ORD-20261016-0104',
+    date: '2026-10-16',
+    productName: '27인치 QHD 165Hz IPS 게이밍 모니터',
+    customer: '정*우',
+    grossAmount: 9500000,
+    fee: 380000,
+    returnLoss: 400000,
+    damage: 250000,
+    etc: 0,
+    settledAmount: 8470000,
+    status: 'DAMAGE_RETURN'
+  },
+  {
+    orderKey: 'ORD-20261016-0105',
+    date: '2026-10-16',
+    productName: '인체공학 무선 버티컬 마우스 풀세트',
+    customer: '강*지',
+    grossAmount: 3600000,
+    fee: 144000,
+    returnLoss: 0,
+    damage: 0,
+    etc: 0,
+    settledAmount: 3456000,
+    status: 'MATCHED'
+  },
+  {
+    orderKey: 'ORD-20261017-0106',
+    date: '2026-10-17',
+    productName: '알루미늄 360도 회전형 노트북 거치대 스탠드',
+    customer: '윤*호',
+    grossAmount: 2400000,
+    fee: 96000,
+    returnLoss: 0,
+    damage: 0,
+    etc: 0,
+    settledAmount: 2304000,
+    status: 'MATCHED'
+  },
+  {
+    orderKey: 'ORD-20261017-0107',
+    date: '2026-10-17',
+    productName: '썬더볼트4 8in1 멀티 허브 도킹스테이션',
+    customer: '임*서',
+    grossAmount: 5500000,
+    fee: 220000,
+    returnLoss: 0,
+    damage: 0,
+    etc: 0,
+    settledAmount: 5280000,
+    status: 'MATCHED'
+  },
+  {
+    orderKey: 'ORD-20261018-0108',
+    date: '2026-10-18',
+    productName: '스마트 블루투스 위치추적 태그 4개입',
+    customer: '조*현',
+    grossAmount: 4500000,
+    fee: 180000,
+    returnLoss: 0,
+    damage: 0,
+    etc: 0,
+    settledAmount: 4320000,
+    status: 'MATCHED'
+  }
+];
+
+// 쿠팡 로켓배송 10월 정산 배치 개별 주문 리스트 (8건 합계: 매출 8,200만원 / 공제 574만원 / 정산실지급 7,626만원 ↔ 통장실입금 7,500만원 차액발생)
+export const COUPANG_DEMO_ORDERS: DemoSettlementOrder[] = [
+  {
+    orderKey: 'CP-20261010-0201',
+    date: '2026-10-10',
+    productName: '로켓 프레시 대용량 공기청정기 필터 세트',
+    customer: '송*진',
+    grossAmount: 14000000,
+    fee: 770000,
+    returnLoss: 0,
+    damage: 0,
+    etc: 0,
+    settledAmount: 13230000,
+    status: 'MATCHED'
+  },
+  {
+    orderKey: 'CP-20261010-0202',
+    date: '2026-10-10',
+    productName: '초경량 카본 삼각대 프로 페셔널 패키지',
+    customer: '한*수',
+    grossAmount: 12000000,
+    fee: 660000,
+    returnLoss: 340000,
+    damage: 0,
+    etc: 0,
+    settledAmount: 11000000,
+    status: 'RETURN_DEDUCTED'
+  },
+  {
+    orderKey: 'CP-20261011-0203',
+    date: '2026-10-11',
+    productName: '4K 방송용 스트리밍 웹캠 마이크 세트',
+    customer: '오*영',
+    grossAmount: 9000000,
+    fee: 495000,
+    returnLoss: 0,
+    damage: 0,
+    etc: 0,
+    settledAmount: 8505000,
+    status: 'MATCHED'
+  },
+  {
+    orderKey: 'CP-20261011-0204',
+    date: '2026-10-11',
+    productName: '초고속 대용량 보조배터리 30000mAh 65W',
+    customer: '신*호',
+    grossAmount: 11000000,
+    fee: 605000,
+    returnLoss: 500000,
+    damage: 0,
+    etc: 0,
+    settledAmount: 9895000,
+    status: 'RETURN_DEDUCTED'
+  },
+  {
+    orderKey: 'CP-20261012-0205',
+    date: '2026-10-12',
+    productName: '고음질 블루투스 스튜디오 모니터 스피커 페어',
+    customer: '문*태',
+    grossAmount: 13000000,
+    fee: 715000,
+    returnLoss: 400000,
+    damage: 0,
+    etc: 0,
+    settledAmount: 11885000,
+    status: 'RETURN_DEDUCTED'
+  },
+  {
+    orderKey: 'CP-20261012-0206',
+    date: '2026-10-12',
+    productName: '마그네틱 고속 무선충전 3in1 스탠드 패드',
+    customer: '권*나',
+    grossAmount: 8000000,
+    fee: 440000,
+    returnLoss: 0,
+    damage: 0,
+    etc: 0,
+    settledAmount: 7560000,
+    status: 'MATCHED'
+  },
+  {
+    orderKey: 'CP-20261013-0207',
+    date: '2026-10-13',
+    productName: '인체공학 전동 모션데스크 컨트롤러 세트',
+    customer: '황*재',
+    grossAmount: 7500000,
+    fee: 412500,
+    returnLoss: 0,
+    damage: 0,
+    etc: 0,
+    settledAmount: 7087500,
+    status: 'MATCHED'
+  },
+  {
+    orderKey: 'CP-20261013-0208',
+    date: '2026-10-13',
+    productName: 'USB-C 올인원 멀티포트 허브 프로페셔널',
+    customer: '배*윤',
+    grossAmount: 7500000,
+    fee: 402500,
+    returnLoss: 0,
+    damage: 0,
+    etc: 0,
+    settledAmount: 7097500,
+    status: 'MATCHED'
+  }
+];
+
 // 초기 기준 데이터셋
 const INITIAL_SALES = [
-  {
-    id: 's-1',
-    order_key: 'ORD-20261015-001',
-    sales_date: '2026-10-15',
+  ...NAVER_DEMO_ORDERS.map((ord, idx) => ({
+    id: `s-naver-${idx + 1}`,
+    order_key: ord.orderKey,
+    product_name: ord.productName,
+    buyer_name: ord.customer,
+    sales_date: ord.date,
     due_date: '2026-11-14',
-    gross_amount: 45000000,
+    gross_amount: ord.grossAmount,
     status: 'PAID',
     business_partners: { company_name: '네이버 스마트스토어', channel_type: 'SMARTSTORE', ceo_name: '네이버(주)' }
-  },
-  {
-    id: 's-2',
-    order_key: 'ORD-20261010-002',
-    sales_date: '2026-10-10',
+  })),
+  ...COUPANG_DEMO_ORDERS.map((ord, idx) => ({
+    id: `s-cp-${idx + 1}`,
+    order_key: ord.orderKey,
+    product_name: ord.productName,
+    buyer_name: ord.customer,
+    sales_date: ord.date,
     due_date: '2026-11-09',
-    gross_amount: 82000000,
+    gross_amount: ord.grossAmount,
     status: 'PAID',
     business_partners: { company_name: '쿠팡 로켓배송', channel_type: 'COUPANG', ceo_name: '쿠팡(주)' }
-  },
+  })),
   {
     id: 's-3',
     order_key: 'INV-20261005-003',
@@ -114,6 +349,8 @@ const INITIAL_SALES = [
   {
     id: 's-7',
     order_key: 'ORD-20261018-007',
+    product_name: '스마트 오피스 데스크 무선 충전 패드',
+    buyer_name: '장*희',
     sales_date: '2026-10-18',
     due_date: '2026-11-17',
     gross_amount: 32000000,
@@ -123,6 +360,8 @@ const INITIAL_SALES = [
   {
     id: 's-8',
     order_key: 'ORD-20261020-008',
+    product_name: '게이밍 스트리머 링라이트 삼각대 풀세트',
+    buyer_name: '서*진',
     sales_date: '2026-10-20',
     due_date: '2026-11-19',
     gross_amount: 41500000,
@@ -169,12 +408,12 @@ const INITIAL_SUSPENSE = [
 ];
 
 const INITIAL_RISKS = [
-  { id: 'r-1', order_key: 'ORD-20261015-001', risk_category: 'FEE', amount: 1800000, description: '네이버 결제 수수료 및 연동 수수료' },
-  { id: 'r-2', order_key: 'ORD-20261015-001', risk_category: 'RETURN', amount: 650000, description: '고객 단순 변심 반품 3건 환불' },
-  { id: 'r-3', order_key: 'ORD-20261015-001', risk_category: 'DAMAGE', amount: 250000, description: '배송 중 제품 파손 보상 처리' },
-  { id: 'r-4', order_key: 'ORD-20261010-002', risk_category: 'FEE', amount: 4500000, description: '쿠팡 로켓배송 판매 수수료 및 보관료' },
-  { id: 'r-5', order_key: 'ORD-20261010-002', risk_category: 'RETURN', amount: 1240000, description: '반품 입고 검수 차감' },
-  { id: 'r-6', order_key: 'ORD-20261012-003', risk_category: 'ETC', amount: 180000, description: '프로모션 추가 할인 보전 차액' },
+  { id: 'r-1', order_key: 'ORD-20261015-0101', risk_category: 'FEE', amount: 340000, description: '네이버 결제 및 연동 수수료' },
+  { id: 'r-2', order_key: 'ORD-20261015-0102', risk_category: 'RETURN', amount: 250000, description: '고객 단순 변심 반품 환불 (기계식 키보드)' },
+  { id: 'r-3', order_key: 'ORD-20261016-0104', risk_category: 'RETURN', amount: 400000, description: '고객 주문 취소 환불 (게이밍 모니터)' },
+  { id: 'r-4', order_key: 'ORD-20261016-0104', risk_category: 'DAMAGE', amount: 250000, description: '배송 중 박스 모서리 파손 보상 (게이밍 모니터)' },
+  { id: 'r-5', order_key: 'CP-20261010-0201', risk_category: 'FEE', amount: 770000, description: '쿠팡 로켓배송 판매 수수료 및 보관료' },
+  { id: 'r-6', order_key: 'CP-20261010-0202', risk_category: 'RETURN', amount: 340000, description: '쿠팡 로켓배송 반품 입고 차감 (삼각대 패키지)' },
   { id: 'r-7', order_key: 'INV-20261005-003', risk_category: 'FEE', amount: 350000, description: 'B2B 전자세금계산서 발행 및 결제대금 예치 수수료' },
   { id: 'r-8', order_key: 'INV-20260901-004', risk_category: 'RETURN', amount: 500000, description: '납품 규격 불일치 반품 차감' },
   { id: 'r-9', order_key: 'INV-20260815-006', risk_category: 'DAMAGE', amount: 450000, description: '도매 물류 운송 중 포장 파손 보상 청구' },
@@ -211,6 +450,8 @@ export default function App() {
       orderKey: string;
       platform: string;
       date: string;
+      productName?: string;
+      customer?: string;
       grossAmount: number;
       settledAmount: number;
       fee: number;
@@ -231,6 +472,9 @@ export default function App() {
   const [isBankDragging, setIsBankDragging] = useState<boolean>(false);
   const [isSettlementDragging, setIsSettlementDragging] = useState<boolean>(false);
   const [filePreviewType, setFilePreviewType] = useState<'bank' | 'settlement' | null>(null);
+
+  const [presetOrderFilter, setPresetOrderFilter] = useState<'ALL' | 'DEDUCTED' | 'NORMAL'>('ALL');
+  const [presetOrderSearch, setPresetOrderSearch] = useState<string>('');
 
   const bankFileInputRef = useRef<HTMLInputElement>(null);
   const settlementFileInputRef = useRef<HTMLInputElement>(null);
@@ -430,7 +674,7 @@ export default function App() {
       return sales.business_partners.channel_type;
     }
     if (orderKey.startsWith('INV-')) return 'B2B';
-    if (orderKey.includes('COUPANG') || orderKey.startsWith('ORD-20261010') || orderKey.startsWith('ORD-20261020')) return 'COUPANG';
+    if (orderKey.includes('COUPANG') || orderKey.startsWith('ORD-20261010') || orderKey.startsWith('ORD-20261020') || orderKey.startsWith('CP-')) return 'COUPANG';
     return 'SMARTSTORE';
   };
 
@@ -717,6 +961,8 @@ export default function App() {
           const orderKey = String(getVal(['주문번호', 'order_key', 'order_id', '주문', '번호', '승인번호']) || `ORD-UP-${1000 + idx}`);
           const platform = String(getVal(['플랫폼명', '플랫폼', '채널', 'platform', 'channel']) || '오픈마켓');
           const date = String(getVal(['주문일자', '일자', 'date', '매출일', '날짜']) || new Date().toISOString().slice(0, 10));
+          const productName = String(getVal(['상품명', '품목', '상품', 'product', 'item']) || '기본 상품');
+          const customer = String(getVal(['고객명', '구매자', '고객', 'customer', 'buyer']) || '-');
 
           const gross = parseNum(getVal(['결제금액', '판매금액', '매출금액', '총금액', 'gross', 'amount']));
           const fee = parseNum(getVal(['정산수수료', '수수료', 'fee', '결제수수료']));
@@ -740,6 +986,8 @@ export default function App() {
             orderKey,
             platform,
             date,
+            productName,
+            customer,
             grossAmount: gross || (settled + fee + returnLoss + damage + etc),
             settledAmount: settled,
             fee,
@@ -786,17 +1034,35 @@ export default function App() {
   };
 
   const handleDownloadSampleSettlementFile = (type: 'match' | 'diff' = 'match') => {
-    const sampleSettlementData = type === 'match' ? [
-      { '주문번호': 'ORD-20261015-001', '플랫폼명': '네이버 스마트스토어', '주문일자': '2026-10-15', '결제금액': 25000000, '정산지급액': 23450000, '정산수수료': 1050000, '반품환불액': 350000, '파손손실액': 150000, '기타공제': 0 },
-      { '주문번호': 'ORD-20261018-007', '플랫폼명': '네이버 스마트스토어', '주문일자': '2026-10-18', '결제금액': 20000000, '정산지급액': 18850000, '정산수수료': 750000, '반품환불액': 300000, '파손손실액': 100000, '기타공제': 0 }
-    ] : [
-      { '주문번호': 'ORD-20261010-002', '플랫폼명': '쿠팡 로켓배송', '주문일자': '2026-10-10', '결제금액': 52000000, '정산지급액': 48300000, '정산수수료': 2800000, '반품환불액': 750000, '파손손실액': 150000, '기타공제': 0 },
-      { '주문번호': 'ORD-20261020-008', '플랫폼명': '쿠팡 로켓배송', '주문일자': '2026-10-20', '결제금액': 30000000, '정산지급액': 27960000, '정산수수료': 1700000, '반품환불액': 490000, '파손손실액': 100000, '기타공제': 250000 }
-    ];
+    const sampleSettlementData = type === 'match' ? NAVER_DEMO_ORDERS.map(o => ({
+      '주문번호': o.orderKey,
+      '플랫폼명': '네이버 스마트스토어',
+      '주문일자': o.date,
+      '상품명': o.productName,
+      '고객명': o.customer,
+      '결제금액': o.grossAmount,
+      '정산지급액': o.settledAmount,
+      '정산수수료': o.fee,
+      '반품환불액': o.returnLoss,
+      '파손손실액': o.damage,
+      '기타공제': o.etc
+    })) : COUPANG_DEMO_ORDERS.map(o => ({
+      '주문번호': o.orderKey,
+      '플랫폼명': '쿠팡 로켓배송',
+      '주문일자': o.date,
+      '상품명': o.productName,
+      '고객명': o.customer,
+      '결제금액': o.grossAmount,
+      '정산지급액': o.settledAmount,
+      '정산수수료': o.fee,
+      '반품환불액': o.returnLoss,
+      '파손손실액': o.damage,
+      '기타공제': o.etc
+    }));
     const ws = XLSX.utils.json_to_sheet(sampleSettlementData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '플랫폼정산서');
-    const filename = type === 'match' ? 'FinanceFlow_샘플_네이버정산서(일치).xlsx' : 'FinanceFlow_샘플_쿠팡정산서(차액발생).xlsx';
+    const filename = type === 'match' ? 'FinanceFlow_샘플_네이버정산서(8건_일치).xlsx' : 'FinanceFlow_샘플_쿠팡정산서(8건_차액발생).xlsx';
     XLSX.writeFile(wb, filename);
   };
 
@@ -1505,7 +1771,12 @@ export default function App() {
                                         {g.orders.map((ord: any) => (
                                           <tr key={ord.id} className="hover:bg-blue-50/20 transition">
                                             <td className="px-4 py-2 font-mono font-bold text-[#1E40AF] whitespace-nowrap">
-                                              {ord.order_key}
+                                              <div>{ord.order_key}</div>
+                                              {ord.product_name && (
+                                                <div className="text-[11px] font-normal text-slate-500 font-sans">
+                                                  {ord.product_name} {ord.buyer_name ? `(${ord.buyer_name})` : ''}
+                                                </div>
+                                              )}
                                             </td>
                                             <td className="px-4 py-2 text-slate-600 font-medium whitespace-nowrap">
                                               {ord.sales_date}
@@ -2097,6 +2368,7 @@ export default function App() {
                                             <tr>
                                               <th className="px-4 py-2.5 whitespace-nowrap">주문번호</th>
                                               <th className="px-4 py-2.5 whitespace-nowrap">플랫폼</th>
+                                              <th className="px-4 py-2.5 whitespace-nowrap">상품명 / 주문자</th>
                                               <th className="px-4 py-2.5 text-right whitespace-nowrap">결제금액</th>
                                               <th className="px-4 py-2.5 text-right whitespace-nowrap">정산실지급액</th>
                                               <th className="px-4 py-2.5 text-right whitespace-nowrap">수수료(FEE)</th>
@@ -2109,10 +2381,17 @@ export default function App() {
                                             {uploadedSettlementFile.rows.map((row, idx) => (
                                               <tr key={idx} className="hover:bg-slate-50">
                                                 <td className="px-4 py-2.5 font-mono font-bold text-[#1E40AF] whitespace-nowrap">
-                                                  {row.orderKey}
+                                                  <div>{row.orderKey}</div>
+                                                  <div className="text-[10px] text-slate-400 font-sans">{row.date}</div>
                                                 </td>
                                                 <td className="px-4 py-2.5 whitespace-nowrap text-slate-700">
                                                   {row.platform}
+                                                </td>
+                                                <td className="px-4 py-2.5 whitespace-nowrap text-slate-800">
+                                                  <div className="font-medium text-xs">{row.productName || '기본 품목'}</div>
+                                                  {row.customer && row.customer !== '-' && (
+                                                    <div className="text-[11px] text-slate-400">주문자: {row.customer}</div>
+                                                  )}
                                                 </td>
                                                 <td className="px-4 py-2.5 text-right font-mono text-slate-900 whitespace-nowrap">
                                                   ₩ {row.grossAmount.toLocaleString()}
@@ -2325,154 +2604,439 @@ export default function App() {
                                 <ArrowRight className="w-4 h-4" />
                               </button>
                             ) : (
-                              <button
-                                onClick={() => {
-                                  const newItem = {
-                                    id: 'sp-coupang-diff',
-                                    sender_name: '쿠팡정산 (차액 발생)',
-                                    amount: 1260000,
-                                    reason: 'UNMATCHED_AMOUNT (지급액 126만원 미달 차액)',
-                                    status: 'PENDING',
-                                    conflict_count: 0
-                                  };
-                                  if (!suspenseList.some(s => s.id === newItem.id)) {
-                                    setSuspenseList(prev => [newItem, ...prev]);
-                                  }
-                                  setActionSuccessMsg(`[가수금 이관 완료] 쿠팡 정산 차액 ₩ 1,260,000이 미확인 보관함(suspense_amounts)으로 성공적으로 이관되었습니다.`);
-                                  setTimeout(() => setActionSuccessMsg(''), 4000);
-                                }}
-                                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-900/20 transition flex items-center gap-2 active:scale-[0.98]"
-                              >
-                                <AlertTriangle className="w-4 h-4" />
-                                <span>차액 ₩ 1,260,000 미확인 가수금으로 이관 & 대사 보류</span>
-                              </button>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <button
+                                  onClick={() => setB2cStep(2)}
+                                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs transition flex items-center gap-1.5 active:scale-[0.98]"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                  <span>2단계: 쿠팡 8건 주문 내역 비교 보기</span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const newItem = {
+                                      id: 'sp-coupang-diff',
+                                      sender_name: '쿠팡정산 (차액 발생)',
+                                      amount: 1260000,
+                                      reason: 'UNMATCHED_AMOUNT (지급액 126만원 미달 차액)',
+                                      status: 'PENDING',
+                                      conflict_count: 0
+                                    };
+                                    if (!suspenseList.some(s => s.id === newItem.id)) {
+                                      setSuspenseList(prev => [newItem, ...prev]);
+                                    }
+                                    setActionSuccessMsg(`[가수금 이관 완료] 쿠팡 정산 차액 ₩ 1,260,000이 미확인 보관함(suspense_amounts)으로 성공적으로 이관되었습니다.`);
+                                    setTimeout(() => setActionSuccessMsg(''), 4000);
+                                  }}
+                                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-900/20 transition flex items-center gap-2 active:scale-[0.98]"
+                                >
+                                  <AlertTriangle className="w-4 h-4" />
+                                  <span>차액 ₩ 1,260,000 미확인 가수금으로 이관 & 대사 보류</span>
+                                </button>
+                              </div>
                             )}
                           </div>
                         </div>
 
-                        {/* STEP 2: 상세 내역 분해 매칭 */}
-                        {b2cStep === 2 && b2cBatch === 'naver' && (
-                          <div className="border border-blue-200 rounded-2xl p-6 bg-blue-50/20 shadow-xs animate-fadeIn">
-                            <div className="flex items-center justify-between pb-4 mb-4 border-b border-blue-100">
-                              <div className="flex items-center gap-2.5">
-                                <span className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">
-                                  2
-                                </span>
+                        {/* STEP 2: 상세 내역 분해 매칭 (네이버 / 쿠팡) */}
+                        {b2cStep === 2 && (() => {
+                          const activeOrders = b2cBatch === 'naver' ? NAVER_DEMO_ORDERS : COUPANG_DEMO_ORDERS;
+                          const totalGross = activeOrders.reduce((acc, cur) => acc + cur.grossAmount, 0);
+                          const totalSettled = activeOrders.reduce((acc, cur) => acc + cur.settledAmount, 0);
+                          const totalFee = activeOrders.reduce((acc, cur) => acc + cur.fee, 0);
+                          const totalReturn = activeOrders.reduce((acc, cur) => acc + cur.returnLoss, 0);
+                          const totalDamage = activeOrders.reduce((acc, cur) => acc + cur.damage, 0);
+                          const totalEtc = activeOrders.reduce((acc, cur) => acc + cur.etc, 0);
+                          const totalDeductions = totalFee + totalReturn + totalDamage + totalEtc;
+
+                          const filteredDemoList = activeOrders.filter(ord => {
+                            const query = presetOrderSearch.trim().toLowerCase();
+                            const matchQuery = !query ||
+                              ord.orderKey.toLowerCase().includes(query) ||
+                              ord.productName.toLowerCase().includes(query) ||
+                              ord.customer.includes(query);
+
+                            if (!matchQuery) return false;
+
+                            if (presetOrderFilter === 'DEDUCTED') {
+                              return ord.returnLoss > 0 || ord.damage > 0 || ord.etc > 0;
+                            }
+                            if (presetOrderFilter === 'NORMAL') {
+                              return ord.returnLoss === 0 && ord.damage === 0 && ord.etc === 0;
+                            }
+                            return true;
+                          });
+
+                          return (
+                            <div className="border border-blue-200 rounded-2xl p-6 bg-blue-50/20 shadow-xs animate-fadeIn space-y-5">
+                              {/* 2단계 헤더 */}
+                              <div className="flex flex-wrap items-center justify-between pb-4 border-b border-blue-100 gap-3">
+                                <div className="flex items-center gap-2.5">
+                                  <span className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                                    2
+                                  </span>
+                                  <div>
+                                    <h3 className="font-bold text-sm text-[#0F172A]">
+                                      2단계 : 주문번호(Order Key) 기준 상세 내역 분해 및 상호 대조
+                                    </h3>
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                      {b2cBatch === 'naver' 
+                                        ? `네이버 스마트스토어 10월 정산 배치 내 ${activeOrders.length}건의 개별 주문 원장을 교차 대조하고 공제 내역을 분석합니다.`
+                                        : `쿠팡 로켓배송 정산 엑셀 내 ${activeOrders.length}건의 개별 주문 원장을 대조하고, 통장 실입금액과의 차액(₩ 1,260,000) 원인을 추적합니다.`}
+                                    </p>
+                                  </div>
+                                </div>
                                 <div>
-                                  <h3 className="font-bold text-sm text-[#0F172A]">
-                                    2단계 : 주문번호(Order Key) 기준 상세 내역 분해 매칭
-                                  </h3>
-                                  <p className="text-xs text-slate-500 mt-0.5">
-                                    정산 엑셀 내 주문번호를 최초 매출 원장과 대조하고 차액을 4대 리스크 카테고리로 자동 분해합니다.
-                                  </p>
+                                  {b2cBatch === 'naver' ? (
+                                    b2cReconciled ? (
+                                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1.5">
+                                        <Check className="w-3.5 h-3.5" />
+                                        대사 및 리스크 DB 동기화 완료
+                                      </span>
+                                    ) : (
+                                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-[#1E40AF]">
+                                        {activeOrders.length}건 상세 분해 대기 중
+                                      </span>
+                                    )
+                                  ) : (
+                                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200 flex items-center gap-1.5">
+                                      <AlertTriangle className="w-3.5 h-3.5" />
+                                      차액 ₩ 1,260,000 대사 보류
+                                    </span>
+                                  )}
                                 </div>
                               </div>
-                              {b2cReconciled ? (
-                                <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1.5">
-                                  <Check className="w-3.5 h-3.5" />
-                                  대사 및 리스크 DB 동기화 완료
-                                </span>
-                              ) : (
-                                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-[#1E40AF]">
-                                  상세 분해 대기 중
-                                </span>
+
+                              {/* 쿠팡 차액 발생 경고 안내 배너 */}
+                              {b2cBatch === 'coupang_mismatch' && (
+                                <div className="p-4 rounded-xl bg-rose-50/80 border border-rose-200 text-xs text-rose-900 flex items-start gap-3">
+                                  <AlertOctagon className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                                  <div className="leading-relaxed">
+                                    <strong className="font-bold">지급 불일치 경고: </strong>
+                                    쿠팡 정산서상 8건 주문의 실지급 합계는 <strong>₩ {totalSettled.toLocaleString()}</strong>이나, 은행 통장 실입금액은 <strong>₩ 75,000,000</strong>으로 <strong className="text-rose-700">₩ 1,260,000의 미달 차액</strong>이 발생했습니다. 
+                                    회계 부정 방지를 위해 개별 주문 승인이 차단되며, 전액 미확인 가수금으로 이관해야 합니다.
+                                  </div>
+                                </div>
                               )}
-                            </div>
 
-                            <div className="bg-white rounded-xl border border-slate-200 p-5 mb-5">
-                              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
-                                <div>
-                                  <span className="text-slate-400 block mb-1">식별 키 (Order Key)</span>
-                                  <strong className="font-mono text-sm text-[#1E40AF]">ORD-20261015-001</strong>
+                              {/* 배치 요약 통계 카드 */}
+                              <div className="bg-white rounded-xl border border-slate-200 p-5">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs pb-4 border-b border-slate-100">
+                                  <div>
+                                    <span className="text-slate-400 block mb-1">배치 정산 주문수</span>
+                                    <strong className="font-mono text-sm text-[#1E40AF]">{activeOrders.length}건 전체</strong>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-400 block mb-1">최초 매출 원장 발생액</span>
+                                    <strong className="text-sm text-slate-900">₩ {totalGross.toLocaleString()}</strong>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-400 block mb-1">정산 실지급 합계</span>
+                                    <strong className="text-sm text-emerald-600">₩ {totalSettled.toLocaleString()}</strong>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-400 block mb-1">총 공제 차액</span>
+                                    <strong className="text-sm text-rose-600">- ₩ {totalDeductions.toLocaleString()}</strong>
+                                  </div>
                                 </div>
-                                <div>
-                                  <span className="text-slate-400 block mb-1">최초 매출 원장 발생액</span>
-                                  <strong className="text-sm text-slate-900">₩ 45,000,000</strong>
-                                </div>
-                                <div>
-                                  <span className="text-slate-400 block mb-1">정산 실지급액</span>
-                                  <strong className="text-sm text-emerald-600">₩ 42,300,000</strong>
-                                </div>
-                                <div>
-                                  <span className="text-slate-400 block mb-1">총 공제 차액</span>
-                                  <strong className="text-sm text-rose-600">- ₩ 2,700,000</strong>
+
+                                <div className="mt-4">
+                                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-3">
+                                    공제 합계 ₩ {totalDeductions.toLocaleString()} 자동 분해 상세 내역 (Risk Records 적재)
+                                  </span>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                    <div className="p-3 rounded-xl bg-[#F8FAFC] border border-slate-200">
+                                      <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-1">
+                                        <span className="flex items-center gap-1.5">
+                                          <span className="w-2 h-2 rounded-full bg-[#1E40AF]" />
+                                          정산수수료 (FEE)
+                                        </span>
+                                        <span className="text-slate-400 font-mono">
+                                          {((totalFee / totalGross) * 100).toFixed(1)}%
+                                        </span>
+                                      </div>
+                                      <div className="text-sm font-bold font-mono text-[#0F172A]">
+                                        ₩ {totalFee.toLocaleString()}
+                                      </div>
+                                      <p className="text-[10px] text-slate-400 mt-0.5">결제 수수료 및 입점 수수료</p>
+                                    </div>
+
+                                    <div className="p-3 rounded-xl bg-[#F8FAFC] border border-slate-200">
+                                      <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-1">
+                                        <span className="flex items-center gap-1.5">
+                                          <span className="w-2 h-2 rounded-full bg-[#DC2626]" />
+                                          반품/취소 (RETURN)
+                                        </span>
+                                        <span className="text-rose-600 font-bold">
+                                          {activeOrders.filter(o => o.returnLoss > 0).length}건
+                                        </span>
+                                      </div>
+                                      <div className="text-sm font-bold font-mono text-rose-600">
+                                        ₩ {totalReturn.toLocaleString()}
+                                      </div>
+                                      <p className="text-[10px] text-slate-400 mt-0.5">고객 반품 및 단순 변심 환불</p>
+                                    </div>
+
+                                    <div className="p-3 rounded-xl bg-[#F8FAFC] border border-slate-200">
+                                      <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-1">
+                                        <span className="flex items-center gap-1.5">
+                                          <span className="w-2 h-2 rounded-full bg-[#38BDF8]" />
+                                          파손/사고 (DAMAGE)
+                                        </span>
+                                        <span className="text-sky-600 font-bold">
+                                          {activeOrders.filter(o => o.damage > 0).length}건
+                                        </span>
+                                      </div>
+                                      <div className="text-sm font-bold font-mono text-sky-600">
+                                        ₩ {totalDamage.toLocaleString()}
+                                      </div>
+                                      <p className="text-[10px] text-slate-400 mt-0.5">배송 중 파손 손실 보상</p>
+                                    </div>
+
+                                    <div className="p-3 rounded-xl bg-[#F8FAFC] border border-slate-200">
+                                      <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-1">
+                                        <span className="flex items-center gap-1.5">
+                                          <span className="w-2 h-2 rounded-full bg-[#94A3B8]" />
+                                          기타 (ETC)
+                                        </span>
+                                        <span className="text-slate-400">-</span>
+                                      </div>
+                                      <div className="text-sm font-bold font-mono text-slate-400">
+                                        ₩ {totalEtc.toLocaleString()}
+                                      </div>
+                                      <p className="text-[10px] text-slate-400 mt-0.5">기타 프로모션 및 분담금</p>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
 
-                              <div className="mt-5 pt-4 border-t border-slate-100">
-                                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-3">
-                                  차액 ₩ 2,700,000 자동 분해 상세 내역 (Risk Records 적재 대상)
+                              {/* 개별 주문 비교 대사 테이블 */}
+                              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
+                                <div className="p-3.5 bg-slate-50/80 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-slate-800">
+                                      오픈마켓 개별 주문 대사 리스트 ({filteredDemoList.length} / {activeOrders.length}건)
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    {/* 검색창 */}
+                                    <div className="relative">
+                                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                      <input
+                                        type="text"
+                                        placeholder="주문번호, 상품명, 고객명..."
+                                        value={presetOrderSearch}
+                                        onChange={(e) => setPresetOrderSearch(e.target.value)}
+                                        className="pl-8 pr-3 py-1 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-[#1E40AF] w-48"
+                                      />
+                                    </div>
+
+                                    {/* 필터 칩 */}
+                                    <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                                      <button
+                                        onClick={() => setPresetOrderFilter('ALL')}
+                                        className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition ${
+                                          presetOrderFilter === 'ALL'
+                                            ? 'bg-white text-slate-900 shadow-2xs'
+                                            : 'text-slate-500 hover:text-slate-800'
+                                        }`}
+                                      >
+                                        전체 ({activeOrders.length})
+                                      </button>
+                                      <button
+                                        onClick={() => setPresetOrderFilter('DEDUCTED')}
+                                        className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition ${
+                                          presetOrderFilter === 'DEDUCTED'
+                                            ? 'bg-white text-rose-600 shadow-2xs'
+                                            : 'text-slate-500 hover:text-slate-800'
+                                        }`}
+                                      >
+                                        차감 발생 ({activeOrders.filter(o => o.returnLoss > 0 || o.damage > 0).length})
+                                      </button>
+                                      <button
+                                        onClick={() => setPresetOrderFilter('NORMAL')}
+                                        className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition ${
+                                          presetOrderFilter === 'NORMAL'
+                                            ? 'bg-white text-emerald-700 shadow-2xs'
+                                            : 'text-slate-500 hover:text-slate-800'
+                                        }`}
+                                      >
+                                        정상 ({activeOrders.filter(o => o.returnLoss === 0 && o.damage === 0).length})
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="overflow-x-auto max-h-80">
+                                  <table className="w-full text-left text-xs">
+                                    <thead className="bg-[#F8FAFC] text-slate-500 font-bold border-b border-slate-200 sticky top-0 text-[11px]">
+                                      <tr>
+                                        <th className="px-4 py-2.5 whitespace-nowrap">주문번호 / 일자</th>
+                                        <th className="px-4 py-2.5 whitespace-nowrap">상품명 / 주문 고객</th>
+                                        <th className="px-4 py-2.5 text-right whitespace-nowrap">결제금액 (원장)</th>
+                                        <th className="px-4 py-2.5 text-right whitespace-nowrap">정산실지급액</th>
+                                        <th className="px-4 py-2.5 text-right whitespace-nowrap">수수료(FEE)</th>
+                                        <th className="px-4 py-2.5 text-right whitespace-nowrap">반품(RETURN)</th>
+                                        <th className="px-4 py-2.5 text-right whitespace-nowrap">파손(DAMAGE)</th>
+                                        <th className="px-4 py-2.5 text-center whitespace-nowrap">대사 판정</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                      {filteredDemoList.map((ord) => (
+                                        <tr key={ord.orderKey} className="hover:bg-slate-50/80 transition">
+                                          <td className="px-4 py-2.5 font-mono font-bold text-[#1E40AF] whitespace-nowrap">
+                                            <div>{ord.orderKey}</div>
+                                            <div className="text-[10px] text-slate-400 font-sans font-normal">{ord.date}</div>
+                                          </td>
+                                          <td className="px-4 py-2.5 whitespace-nowrap text-slate-900">
+                                            <div className="font-semibold text-xs text-slate-800">{ord.productName}</div>
+                                            <div className="text-[11px] text-slate-400 font-normal">주문자: {ord.customer}</div>
+                                          </td>
+                                          <td className="px-4 py-2.5 text-right font-mono font-semibold text-slate-900 whitespace-nowrap">
+                                            ₩ {ord.grossAmount.toLocaleString()}
+                                          </td>
+                                          <td className="px-4 py-2.5 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
+                                            ₩ {ord.settledAmount.toLocaleString()}
+                                          </td>
+                                          <td className="px-4 py-2.5 text-right font-mono text-[#1E40AF] whitespace-nowrap">
+                                            ₩ {ord.fee.toLocaleString()}
+                                          </td>
+                                          <td className="px-4 py-2.5 text-right font-mono whitespace-nowrap">
+                                            {ord.returnLoss > 0 ? (
+                                              <span className="font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                                                - ₩ {ord.returnLoss.toLocaleString()}
+                                              </span>
+                                            ) : (
+                                              <span className="text-slate-400">-</span>
+                                            )}
+                                          </td>
+                                          <td className="px-4 py-2.5 text-right font-mono whitespace-nowrap">
+                                            {ord.damage > 0 ? (
+                                              <span className="font-bold text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">
+                                                - ₩ {ord.damage.toLocaleString()}
+                                              </span>
+                                            ) : (
+                                              <span className="text-slate-400">-</span>
+                                            )}
+                                          </td>
+                                          <td className="px-4 py-2.5 text-center whitespace-nowrap">
+                                            {ord.damage > 0 ? (
+                                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 whitespace-nowrap">
+                                                🔵 파손/반품 차감
+                                              </span>
+                                            ) : ord.returnLoss > 0 ? (
+                                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+                                                🔴 반품 환불 차감
+                                              </span>
+                                            ) : (
+                                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                                                🟢 전액 일치
+                                              </span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                    <tfoot className="bg-slate-50/90 font-bold border-t border-slate-200 text-slate-800 text-xs">
+                                      <tr>
+                                        <td className="px-4 py-2.5 whitespace-nowrap" colSpan={2}>
+                                          합계 ({filteredDemoList.length}건)
+                                        </td>
+                                        <td className="px-4 py-2.5 text-right font-mono whitespace-nowrap">
+                                          ₩ {filteredDemoList.reduce((sum, o) => sum + o.grossAmount, 0).toLocaleString()}
+                                        </td>
+                                        <td className="px-4 py-2.5 text-right font-mono text-emerald-700 whitespace-nowrap">
+                                          ₩ {filteredDemoList.reduce((sum, o) => sum + o.settledAmount, 0).toLocaleString()}
+                                        </td>
+                                        <td className="px-4 py-2.5 text-right font-mono text-[#1E40AF] whitespace-nowrap">
+                                          ₩ {filteredDemoList.reduce((sum, o) => sum + o.fee, 0).toLocaleString()}
+                                        </td>
+                                        <td className="px-4 py-2.5 text-right font-mono text-rose-600 whitespace-nowrap">
+                                          {filteredDemoList.reduce((sum, o) => sum + o.returnLoss, 0) > 0 
+                                            ? `- ₩ ${filteredDemoList.reduce((sum, o) => sum + o.returnLoss, 0).toLocaleString()}` 
+                                            : '-'}
+                                        </td>
+                                        <td className="px-4 py-2.5 text-right font-mono text-sky-600 whitespace-nowrap">
+                                          {filteredDemoList.reduce((sum, o) => sum + o.damage, 0) > 0 
+                                            ? `- ₩ ${filteredDemoList.reduce((sum, o) => sum + o.damage, 0).toLocaleString()}` 
+                                            : '-'}
+                                        </td>
+                                        <td className="px-4 py-2.5 text-center text-slate-400 font-normal">
+                                          -
+                                        </td>
+                                      </tr>
+                                    </tfoot>
+                                  </table>
+                                </div>
+                              </div>
+
+                              {/* 하단 액션 버튼 */}
+                              <div className="flex items-center justify-between pt-2">
+                                <span className="text-xs text-slate-500">
+                                  {b2cBatch === 'naver'
+                                    ? `총 ${activeOrders.length}건 주문 내역이 통장 입금액(₩ 42,300,000)과 정확히 부합합니다.`
+                                    : `⚠️ 쿠팡 차액 ₩ 1,260,000이 해소되지 않아 대사 확정이 불가합니다.`}
                                 </span>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                  <div className="p-3.5 rounded-xl bg-[#F8FAFC] border border-slate-200">
-                                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-1">
-                                      <span className="flex items-center gap-1.5">
-                                        <span className="w-2 h-2 rounded-full bg-[#1E40AF]" />
-                                        정산수수료 (FEE)
-                                      </span>
-                                      <span className="text-slate-400">4.0%</span>
-                                    </div>
-                                    <div className="text-sm font-bold font-mono text-[#0F172A]">₩ 1,800,000</div>
-                                    <p className="text-[10px] text-slate-400 mt-1">네이버 결제 및 연동 수수료</p>
-                                  </div>
+                                {b2cBatch === 'naver' ? (
+                                  <button
+                                    disabled={b2cReconciled || currentRole === 'viewer'}
+                                    onClick={() => {
+                                      setB2cReconciled(true);
+                                      const orderKeys = NAVER_DEMO_ORDERS.map(o => o.orderKey);
+                                      setSalesRecords(prev => prev.map(s => orderKeys.includes(s.order_key) ? { ...s, status: 'PAID' } : s));
+                                      
+                                      const newAudit = {
+                                        id: `a-${Date.now()}`,
+                                        action_type: 'AUTO_2STEP_RECONCILE',
+                                        target_id: 'NAVER_OCT_BATCH (8건)',
+                                        actor_email: 'system@auto.reconcile',
+                                        actor_role: currentRole,
+                                        memo: `네이버 스마트스토어 8개 개별 주문 대사 확정 및 4대 리스크(₩ 2,700,000) DB 동기화 완료`,
+                                        amount: 42300000,
+                                        created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+                                      };
+                                      setAuditLogs(prev => [newAudit, ...prev]);
 
-                                  <div className="p-3.5 rounded-xl bg-[#F8FAFC] border border-slate-200">
-                                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-1">
-                                      <span className="flex items-center gap-1.5">
-                                        <span className="w-2 h-2 rounded-full bg-[#DC2626]" />
-                                        반품/취소 (RETURN)
-                                      </span>
-                                      <span className="text-rose-600">3건</span>
-                                    </div>
-                                    <div className="text-sm font-bold font-mono text-[#0F172A]">₩ 650,000</div>
-                                    <p className="text-[10px] text-slate-400 mt-1">고객 단순변심 취소 환불</p>
-                                  </div>
-
-                                  <div className="p-3.5 rounded-xl bg-[#F8FAFC] border border-slate-200">
-                                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-1">
-                                      <span className="flex items-center gap-1.5">
-                                        <span className="w-2 h-2 rounded-full bg-[#38BDF8]" />
-                                        파손/사고 (DAMAGE)
-                                      </span>
-                                      <span className="text-sky-600">1건</span>
-                                    </div>
-                                    <div className="text-sm font-bold font-mono text-[#0F172A]">₩ 250,000</div>
-                                    <p className="text-[10px] text-slate-400 mt-1">배송 중 모서리 파손 보상</p>
-                                  </div>
-
-                                  <div className="p-3.5 rounded-xl bg-[#F8FAFC] border border-slate-200">
-                                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-1">
-                                      <span className="flex items-center gap-1.5">
-                                        <span className="w-2 h-2 rounded-full bg-[#94A3B8]" />
-                                        기타 (ETC)
-                                      </span>
-                                      <span className="text-slate-400">-</span>
-                                    </div>
-                                    <div className="text-sm font-bold font-mono text-slate-400">₩ 0</div>
-                                    <p className="text-[10px] text-slate-400 mt-1">기타 페널티/할인 보전 없음</p>
-                                  </div>
-                                </div>
+                                      setActionSuccessMsg(`[2-Step 대사 완료] 네이버 스마트스토어 8개 개별 주문(총 ₩ 45,000,000) 대사가 확정되었으며, 리스크 공제 내역(₩ 2,700,000)이 Risk DB에 성공적으로 적재되었습니다.`);
+                                      setTimeout(() => setActionSuccessMsg(''), 4500);
+                                    }}
+                                    className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs shadow-md shadow-emerald-900/20 transition flex items-center gap-2 active:scale-[0.98]"
+                                  >
+                                    <CheckCheck className="w-4 h-4" />
+                                    <span>
+                                      {b2cReconciled ? '8건 주문 대사 및 장부 반영 완료됨' : '8건 주문 2-Step 최종 대사 확정 & Risk DB 동기화'}
+                                    </span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      const newItem = {
+                                        id: 'sp-coupang-diff',
+                                        sender_name: '쿠팡정산 (차액 발생)',
+                                        amount: 1260000,
+                                        reason: 'UNMATCHED_AMOUNT (지급액 126만원 미달 차액)',
+                                        status: 'PENDING',
+                                        conflict_count: 0
+                                      };
+                                      if (!suspenseList.some(s => s.id === newItem.id)) {
+                                        setSuspenseList(prev => [newItem, ...prev]);
+                                      }
+                                      setActionSuccessMsg(`[가수금 이관 완료] 쿠팡 정산 차액 ₩ 1,260,000이 미확인 보관함(suspense_amounts)으로 성공적으로 이관되었습니다.`);
+                                      setTimeout(() => setActionSuccessMsg(''), 4000);
+                                    }}
+                                    className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-900/20 transition flex items-center gap-2 active:scale-[0.98]"
+                                  >
+                                    <AlertTriangle className="w-4 h-4" />
+                                    <span>차액 ₩ 1,260,000 미확인 가수금으로 이관 & 대사 보류</span>
+                                  </button>
+                                )}
                               </div>
                             </div>
-
-                            <div className="flex items-center justify-end gap-3">
-                              <button
-                                disabled={b2cReconciled || currentRole === 'viewer'}
-                                onClick={() => {
-                                  setB2cReconciled(true);
-                                  setSalesRecords(prev => prev.map(s => s.order_key === 'ORD-20261015-001' ? { ...s, status: 'PAID' } : s));
-                                  setActionSuccessMsg(`[2-Step 대사 완료] ORD-20261015-001 정산이 확정되었으며, 리스크 공제 내역(₩ 2,700,000)이 Risk DB에 성공적으로 적재되었습니다.`);
-                                  setTimeout(() => setActionSuccessMsg(''), 4000);
-                                }}
-                                className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-xs shadow-md shadow-emerald-900/20 transition flex items-center gap-2 active:scale-[0.98]"
-                              >
-                                <CheckCheck className="w-4 h-4" />
-                                <span>2-Step 최종 대사 확정 & Risk DB 동기화</span>
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
