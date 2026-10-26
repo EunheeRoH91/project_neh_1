@@ -1787,7 +1787,7 @@ export default function App() {
               title="4개 시트 통합 정산 대사 결과 보고서(.xlsx) 다운로드"
             >
               <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">10월 정산 보고서 (.xlsx)</span>
+              <span className="hidden sm:inline">대사 보고서 (.xlsx)</span>
             </button>
 
             <button
@@ -3827,7 +3827,7 @@ export default function App() {
                                         className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-xs transition flex items-center gap-1.5 shrink-0 shadow-2xs"
                                       >
                                         <Download className="w-4 h-4 text-emerald-600" />
-                                        <span>10월 정산 보고서 내보내기 (.xlsx)</span>
+                                        <span>대사 결과 리포트 내보내기 (.xlsx)</span>
                                       </button>
                                     </>
                                   )}
