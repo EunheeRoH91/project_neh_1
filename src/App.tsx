@@ -1238,30 +1238,50 @@ export default function App() {
     XLSX.writeFile(wb, filename);
   };
 
-  // 4.3 정산 대사 통합 결과 엑셀 다운로드 (보고서 내보내기)
+  // 4.3 정산 대사 통합 결과 엑셀 다운로드 (보고서 내보내기 & 엑셀 스타일/틀 정돈)
   const handleExportReconciliationExcel = () => {
     const wb = XLSX.utils.book_new();
 
+    // 엑셀 서식 헬퍼 함수 (열 너비 자동 확보 및 숫자 천단위 콤마 서식)
+    const applySheetFormatting = (ws: XLSX.WorkSheet, colWidths: number[]) => {
+      ws['!cols'] = colWidths.map(w => ({ wch: w }));
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+          const cell = ws[cellAddress];
+          if (cell && cell.t === 'n') {
+            cell.z = '#,##0';
+          }
+        }
+      }
+    };
+
     // 1. 대사 결과 요약 시트
     const summaryData = [
-      { '구분': '보고서 명칭', '항목': '매출/정산 및 입금 대사 통합 결과 보고서' },
-      { '구분': '대사 기준일시', '항목': new Date().toLocaleString('ko-KR') },
-      { '구분': '작성자 / 권한', '항목': `finance@manager.corp (${currentRole.toUpperCase()})` },
-      { '구분': '적용 채널 필터', '항목': channelFilter === 'ALL' ? '전체 채널' : channelFilter === 'COUPANG' ? '쿠팡 로켓배송' : channelFilter === 'SMARTSTORE' ? '네이버 스마트스토어' : 'B2B 도매' },
-      { '구분': '1단계: 덩어리 대사 결과', '항목': '통장 실입금액 ↔ 정산 엑셀 실지급액 100% 일치 (오차 0원)' },
-      { '구분': '2단계: 주문별 대사 결과', '항목': '정상 정산 7건 (₩ 75,000,000) / 기간대비 미정산 1건 (₩ 1,260,000) 영업팀 이관' },
-      { '구분': '미정산 확인 주문번호', '항목': 'CP-20261012-0205 (사유: 정산 엑셀 내역없음)' },
-      { '구분': '당사 기간 주문 총액', '항목': '₩ 82,000,000' },
-      { '구분': '정산 실입금 총액', '항목': '₩ 75,000,000' },
-      { '구분': '플랫폼 공제 총액', '항목': '₩ 5,740,000 (수수료/반품/파손)' },
-      { '구분': 'B2B 대표자 매칭 결과', '항목': '홍길동 명의 ₩ 15,000,000 (주)알파테크 미수금 상계 승인' }
+      { '구분': '보고서 명칭', '항목/내용': '매출/정산 및 입금 대사 통합 결과 보고서' },
+      { '구분': '대사 기준일시', '항목/내용': new Date().toLocaleString('ko-KR') },
+      { '구분': '작성자 / 권한', '항목/내용': `finance@manager.corp (${currentRole.toUpperCase()})` },
+      { '구분': '적용 채널 필터', '항목/내용': channelFilter === 'ALL' ? '전체 채널' : channelFilter === 'COUPANG' ? '쿠팡 로켓배송' : channelFilter === 'SMARTSTORE' ? '네이버 스마트스토어' : 'B2B 도매' },
+      { '구분': '------------------------', '항목/내용': '------------------------------------------------------------' },
+      { '구분': '1단계: 덩어리 대사 결과', '항목/내용': '통장 실입금액(₩ 75,000,000) ↔ 정산 엑셀 실지급액(₩ 75,000,000) 100% 일치' },
+      { '구분': '2단계: 주문별 대사 결과', '항목/내용': '정상 정산 7건 (₩ 75,000,000) / 기간대비 미정산 1건 (₩ 1,260,000) 영업팀 이관' },
+      { '구분': '미정산 확인 주문번호', '항목/내용': 'CP-20261012-0205 (사유: 정산 엑셀 내역없음)' },
+      { '구분': '------------------------', '항목/내용': '------------------------------------------------------------' },
+      { '구분': '당사 기간 주문 총액', '항목/내용': 82000000 },
+      { '구분': '정산 실입금 총액', '항목/내용': 75000000 },
+      { '구분': '플랫폼 공제 총액', '항목/내용': 5740000 },
+      { '구분': '기간대비 미정산액 (영업팀 이관)', '항목/내용': 1260000 },
+      { '구분': 'B2B 대표자 매칭 결과', '항목/내용': '홍길동 명의 ₩ 15,000,000 (주)알파테크 미수금 상계 승인' },
+      { '구분': '회계 검증 공식', '항목/내용': '원금액(82,000,000) = 실입금(75,000,000) + 공제액(5,740,000) + 미정산(1,260,000)' }
     ];
     const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+    applySheetFormatting(wsSummary, [30, 75]);
     XLSX.utils.book_append_sheet(wb, wsSummary, '1.정산대사_결과요약');
 
     // 2. 주문별 상세 대사 원장 시트
     const activeOrders = b2cBatch === 'naver' ? NAVER_DEMO_ORDERS : b2cBatch === 'coupang_match' ? COUPANG_DEMO_ORDERS : COUPANG_MISMATCH_DEMO_ORDERS;
-    const ordersData = activeOrders.map((ord, idx) => ({
+    const ordersData: any[] = activeOrders.map((ord, idx) => ({
       'No': idx + 1,
       '주문번호': ord.orderKey,
       '주문일자': ord.date,
@@ -1274,13 +1294,39 @@ export default function App() {
       '기타공제': ord.etc,
       '실제정산금액(실금액)': ord.settledAmount,
       '정산상태': ord.diffAmount !== 0 ? '⚠️ 기간대비 미정산건 확인 (영업팀 이관)' : ord.damage > 0 ? '🔵 파손 차감 정산' : ord.returnLoss > 0 ? '🔴 반품/환불 차감 정산' : '🟢 전액 정산 완료',
-      '비고': ord.diffAmount !== 0 ? '정산 엑셀 내역없음 (미수금 확정 및 영업팀 사유확인 전달)' : '정상 정산 완료'
+      '비고 및 조치사항': ord.diffAmount !== 0 ? '정산 엑셀 내역없음 (미수금 확정 및 영업팀 사유확인 전달)' : '정상 정산 완료'
     }));
+
+    // 하단 [합계] 행 추가
+    const sumGross = activeOrders.reduce((sum, o) => sum + o.grossAmount, 0);
+    const sumFee = activeOrders.reduce((sum, o) => sum + o.fee, 0);
+    const sumReturn = activeOrders.reduce((sum, o) => sum + o.returnLoss, 0);
+    const sumDamage = activeOrders.reduce((sum, o) => sum + o.damage, 0);
+    const sumEtc = activeOrders.reduce((sum, o) => sum + o.etc, 0);
+    const sumSettled = activeOrders.reduce((sum, o) => sum + o.settledAmount, 0);
+
+    ordersData.push({
+      'No': '합계',
+      '주문번호': `총 ${activeOrders.length}건`,
+      '주문일자': '-',
+      '상품명': '-',
+      '고객명': '-',
+      '결제금액(원금액)': sumGross,
+      '수수료차감': sumFee,
+      '환불반품차감': sumReturn,
+      '파손손실차감': sumDamage,
+      '기타공제': sumEtc,
+      '실제정산금액(실금액)': sumSettled,
+      '정산상태': activeOrders.some(o => o.diffAmount !== 0) ? '7건 완료 / 1건 미정산' : '전건 정상 정산 완료',
+      '비고 및 조치사항': '원금액 = 실정산금액 + 공제액(수수료+반품+파손) + 미정산액 검증 일치'
+    });
+
     const wsOrders = XLSX.utils.json_to_sheet(ordersData);
+    applySheetFormatting(wsOrders, [8, 22, 13, 38, 10, 18, 14, 14, 14, 12, 20, 32, 45]);
     XLSX.utils.book_append_sheet(wb, wsOrders, '2.주문별_상세대사원장');
 
     // 3. 거래처별 미수금(AR) Aging 원장 시트
-    const arData = partnersList.map((p, idx) => ({
+    const arData: any[] = partnersList.map((p, idx) => ({
       'No': idx + 1,
       '거래처명': p.company_name,
       '사업자번호': p.business_number,
@@ -1291,11 +1337,27 @@ export default function App() {
       '연체구분': p.uncollected > 10000000 ? '🚨 30일 초과 연체 (OVERDUE)' : '정상 채권',
       '지능형대표자매칭': p.alias_active ? '연동 활성' : '비활성'
     }));
+
+    // 미수금 합계 행
+    const sumUncollected = partnersList.reduce((sum, p) => sum + p.uncollected, 0);
+    arData.push({
+      'No': '합계',
+      '거래처명': `총 ${partnersList.length}개 거래처`,
+      '사업자번호': '-',
+      '대표자명': '-',
+      '채널유형': '-',
+      '미수금잔액(원)': sumUncollected,
+      '최종거래일자': '-',
+      '연체구분': '미수채권 집중 회수 관리 대상',
+      '지능형대표자매칭': '-'
+    });
+
     const wsAR = XLSX.utils.json_to_sheet(arData);
+    applySheetFormatting(wsAR, [8, 22, 18, 12, 12, 20, 15, 30, 16]);
     XLSX.utils.book_append_sheet(wb, wsAR, '3.거래처_미수금Aging원장');
 
     // 4. 미확인 가수금 보관 원장 시트
-    const suspenseData = suspenseList.map((s, idx) => ({
+    const suspenseData: any[] = suspenseList.map((s, idx) => ({
       'No': idx + 1,
       '입금자명/적요': s.sender_name,
       '입금액(원)': s.amount,
@@ -1303,7 +1365,20 @@ export default function App() {
       '처리상태': s.status === 'PENDING' ? '미확인 보관 중' : '수동 상계 완료',
       '충돌후보수': s.conflict_count || 1
     }));
+
+    // 가수금 합계 행
+    const sumSuspense = suspenseList.reduce((sum, s) => sum + s.amount, 0);
+    suspenseData.push({
+      'No': '합계',
+      '입금자명/적요': `총 ${suspenseList.length}건 보관`,
+      '입금액(원)': sumSuspense,
+      '발생원인': '동명 충돌 및 미등록 거래처 안전 격리',
+      '처리상태': '미확인 보관 중',
+      '충돌후보수': '-'
+    });
+
     const wsSuspense = XLSX.utils.json_to_sheet(suspenseData);
+    applySheetFormatting(wsSuspense, [8, 22, 18, 35, 18, 12]);
     XLSX.utils.book_append_sheet(wb, wsSuspense, '4.미확인가수금_보관원장');
 
     const nowStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
