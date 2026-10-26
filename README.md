@@ -1,5 +1,7 @@
 # 📊 FinanceFlow: 다채널 매출/정산 및 입금 대사 자동화 시스템
 
+🔗 **라이브 데모 사이트 바로가기**: [https://EunheeRoH91.github.io/project_neh_1/](https://EunheeRoH91.github.io/project_neh_1/)
+
 > **기업 자금/재무팀 전용 통합 정산 및 내부통제 자동화 플랫폼**  
 > 다채널(B2B 도매, 스마트스토어, 쿠팡, 자사몰 PG) 매출 데이터와 은행 통장 입금 내역(Bank Statement)을 교차 검증하고, AI 텍스트 분석 및 룰 기반 엔진으로 미수금(AR), 수익 누수 리스크(수수료/반품/파손), 미확인 입금액(가수금)을 강력하게 통제합니다.
 

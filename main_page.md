@@ -4,7 +4,7 @@ title: Finance & Accounting Portfolio
 
 <columns>
 	<column ratio="30">
-		![프로필 사진](https://prod-files-secure.s3.us-west-2.amazonaws.com/1fb626eb-8010-4508-82df-7d6ce27e832e/a520e77b-cf97-4499-a233-c7c4d4149667/Adobe_Express_-_file.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB466U7ALY3AN%2F20261022%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20261022T045339Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEKT%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEaCXVzLXdlc3QtMiJHMEUCIGlur93x4qXSha8fYOn8661pf2gBQNeQOzoIvRKLM2NDAiEA04l74pCJ4Bx0It6mJXShmqOEmI0q3Ab%2FQHuhp%2BK1N9Yq%2FwMIbRAAGgw2Mzc0MjMxODM4MDUiDDBWD6qOrY4C9hsVYCrcA5EXVbRM039P9ipwHKTVY1Y2dtPIXli1zUjPWEWWuzwWwYnK9wpB%2F3kuzq7aE0Wp8PFYFvVsH6MWbkA9RIqredKduifZQ2POkhdCG4QLPV%2B%2B0INibQRB6%2FZdMAp7kc9BFherdN0cT%2F3CKDLBx%2BFb9tPUjkNHTv3O9%2B9gH8fsqz3Swi4FAildJMor10egDcd83KOdpSr4PRVD4f2Qtrjz7tPkH%2BI5k4z0IZE5Zu66%2FsvoCzn8Cz94wD%2FtZ%2B7JXzfoqdtk26rY1fRCVox0gspApF4Q9r7DH5al7RruFZHx3IRb%2FhJq%2B8Gdu6l6mRW3I%2Fti4n1Vua1klupv3GzMWh2y4JbemF5olAvVPq6gUwYRK%2B0nVX8yz%2FMJ6FSygQiLueKCB2D7iO57PhMgFTucEvwAEBSdYVGxPWyDHGcM7aUs5QdqdQqCI2W%2FZ3gQuBEBAQNisBJZmr29m5DC%2F4N9WucP17XfdeyKNnEgt9iwMfhtTXvgs3BCSLB1sgqkdGZONvkSzKeEQCo79N9x%2BPgInNkIL4dcwC3RYBRHs23LC%2BDPK4sqcQxFBhh19Dd68VEqNgCAh2GXadngFGL%2BZdIsJZWdHWU30O2fz3EvcoEFJEhQO5rmuwp9F4NH0sVa9dMLWS5tYGOqUBAd4n8kBz3XuCLCKu3lAxc2lOM%2FafyWYH0Auekxo4vZyEn0oARATQcufcAzn1CyJpqI7br1cz6%2FVtu3YN6so%2Bi69b3ZGqS%2BFVmYuYPpAx1RZJ7CSl7dPjmfJB0jLZeRD9swSpM3sIC20hXBuhMPb2jzfhPZqLyHNlA9jrBsJx9RjUl%2FN0E1qAxwf9CAnQXJLNkjoaRfJoROJ0OKlsWpbHi6%2FGI1H2&X-Amz-Signature=7c34b1d4cf82730504cfa55ebc3f520df4b60ec14fbdc7c6428990c15fffa479&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject#notion_record=block.2ba57a8e-0d2f-4448-a815-b7886bab9f82.1fb626eb-8010-4508-82df-7d6ce27e832e)
+		![](https://prod-files-secure.s3.us-west-2.amazonaws.com/1fb626eb-8010-4508-82df-7d6ce27e832e/a520e77b-cf97-4499-a233-c7c4d4149667/Adobe_Express_-_file.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB466XFUTUM7F%2F20261026%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20261026T053430Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEAQaCXVzLXdlc3QtMiJHMEUCIHT%2Br1xTunQyHI7b0YZEKnEuUy3FKl%2FYNtAKmfHgNPTsAiEAnNQP2jBphxoJ2sEyjWSABMYDWwZ1BQZeFJ6CAOq%2B4TUqiAQIzP%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FARAAGgw2Mzc0MjMxODM4MDUiDF9iyZ8nxzTFBxd6EyrcA7DS9YL%2B85FCDL4TLkR3TUZoZxhPwKcxBl2P%2Bhi5ClIONP%2Fsyoy0W85fWCDuLMvv4zekFakuOhj0jreyxQsIYdzZHTx2Kffcv0sUQf6%2BgFFJ7vy%2FtBQiwNxwt61sDuaqcLGIkUYT7pC1XBIuOBmY4cd77GMet%2BccVMtSqN74vIZ50Il2iKcjjzJifcitwmPQYG0GbgueDu0OsNLasZWxHipkPW4g9upO89VZUZHLNOhKv%2BW1PK%2FAi7tw1c2ohgeQ9wehanGwKcAxzevmtKS%2BtHta%2Fq4uqg5a1H14WkajVfVRuxlmcch3kcRCeoDHOTOSHmsZfgiV7guy9Q0daOVjVVjrYkS3YMaobRlXIN%2FuDiJhwCAT48PUKVxe5hes3VmfmPQI7nSopQrVoTPVDp581NInpAZiLLgtlCz8xdrZryN6huuhbvVQERnAE0E50GwxylKWwLlivycfjt7SHbNMCYvxrGCZUU6gP1zeL7EjoEgXXqHPXp6kigs0eFlnunDZrEip1tQasjXWsKnsfSo7G2y25RUOJ22VnbroqKKeu9RW%2Bg3F%2FublOtkg%2FEAjEwBxzb2%2FrRa3O8MW7RgVoIlRr0x%2FwI00eRNm4NEPzF8%2FbAprhsu5W5SnQWLbSGgDMM2Z%2B9YGOqUBnsmDKQZ7pmWboXBggfozWjJi73BWSWpk1sT4FsRTCOxcjAmUGOsHeqCp%2BHy4WufqxzpEC%2BztWDUxnInF9KMYCiWu1VlinninQaW6YiOF%2FyPvFpFU52xv7pCvxZWrQrffMq%2BFIGslbKCOcxxYGiJ4RFngmViYmGn4drxZhQxbqb%2BwRq4NYWxbqFInKKz%2FlJCdUpeIyjUUvFrjatCGfFWyIRIlM2CZ&X-Amz-Signature=57c71a41e9b0040c09eed58b70ae323bf223a6b1cca0d760be903244cc442cfb&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject#notion_record=block.2ba57a8e-0d2f-4448-a815-b7886bab9f82.1fb626eb-8010-4508-82df-7d6ce27e832e)
 		<empty-block/>
 	</column>
 	<column ratio="70">
@@ -22,30 +22,27 @@ title: Finance & Accounting Portfolio
 
 <empty-block/>
 
-<columns>
-	<column ratio="50">
-		<span color="gray">DOMAIN EXPERTISE</span>
-		## Accounting & Finance
-		회계·자금 실무에 대한 명확한 이해와 꼼꼼한 검토 역량을 바탕으로 업무를 수행합니다.
-		<empty-block/>
-		- **회계 전표 및 증빙 검토**: 거래 내역의 적격성 확인 및 회계 기준에 부합하는 전표 처리
-		- **자금 현황 관리**: 일별·월별 입출금 현황 파악 및 자금 집행 흐름 모니터링
-		- **정산 자료 대조와 차이 확인**: 복수 채널의 원천 데이터와 실입금액 간 정합성 대조
-		- **세무 관련 실무 지원**: 부가세 및 원천세 등 주기적 신고를 위한 기초자료 정비
-		- **실무 흐름과 내부통제 이해**: 반복적인 루틴 속 병목 지점 및 오류 발생 요인 분석
-	</column>
-	<column ratio="50">
-		<span color="gray">TECHNICAL SKILLS</span>
-		## Data & Automation
-		손에 익은 엑셀과 현대적인 웹·DB 도구를 결합하여 실무 프로세스를 고도화합니다.
-		<empty-block/>
-		- **엑셀 기반 정제 & 검토**: 대용량 실무 테이블 구조화, 함수(`SUM`, `IF`, `VLOOKUP`, `TRIM` 등)
-		- **매크로 & 프로세스 자동화**: 반복 정렬·계산·대조 자동화
-		- **데이터베이스 모델링**: Supabase(PostgreSQL), 테이블 스키마 설계 및 RLS 보안 통제
-		- **프론트엔드 도구 연계**: React, TypeScript 기반 재무 대시보드 및 대사 도구 개발
-		- **내부통제 & 감사 추적**: 역할 기반 권한 분리(RBAC), Audit Log 설계
-	</column>
-</columns>
+<span color="gray">DOMAIN EXPERTISE</span>
+
+## 💼 실무 역량
+
+<empty-block/>
+
+<database url="https://app.notion.com/p/4050fcd11613814d9d8fe40dd6e216b4" inline="true" icon="💼" data-source-url="collection://4050fcd1-1613-815c-884d-000b4b53e35e">실무 역량</database>
+
+<empty-block/>
+
+---
+
+<empty-block/>
+
+<span color="gray">TECHNICAL SKILLS</span>
+
+## 🛠️ 보유 기술
+
+<empty-block/>
+
+<database url="https://app.notion.com/p/4050fcd1161381a29b4ac4f9c59bb36c" inline="true" icon="🛠️" data-source-url="collection://4050fcd1-1613-818a-a647-000b5ecf7876">보유 기술</database>
 
 <empty-block/>
 
@@ -72,11 +69,11 @@ title: Finance & Accounting Portfolio
 		### 매출/정산 및 입금 대사 자동화 시스템
 		**Multi-channel Revenue, Settlement & Deposit Reconciliation System**
 		<empty-block/>
-		다채널(B2C 자사몰/스마트스토어, B2B 도매) 매출 원장과 은행 입금 내역을 교차 검증하는 룰 기반 자동 대사 엔진 및 미수금(AR) 리스크 관리 도구입니다. 엑셀 수작업의 인적 오류와 가수금 누적 문제를 해결하기 위해 2-Step 매칭 엔진과 엄격한 내부통제(RLS)를 설계하여 현재 개발을 진행하고 있습니다.
+		- **해결 과제**: 다채널(쇼핑몰·B2B) 입금 내역과 매출 원장의 수작업 대조 병목 해결
+		- **핵심 솔루션**: 2단계 룰 기반 매칭 엔진 + 거래처 대표자명 교차 매핑 + 동명 충돌 방지 안전장치
+		- **기술 스택**: `React` `TypeScript` `Supabase` &nbsp;•&nbsp; **상태**: `프로토타입 개발 진행 중`
 		<empty-block/>
-		<span color="gray">분야: 자금·정산 자동화 시스템 &nbsp;•&nbsp; 기술 스택: Supabase, React, TypeScript &nbsp;•&nbsp; 상태: 프로토타입 구현 및 고도화 중</span>
-		<empty-block/>
-		<page url="https://app.notion.com/p/3ff0fcd116138108a06fc6f8acf469fc">PROJECT 01 — 매출/정산 및 입금 대사 자동화 시스템</page>
+		<page url="https://app.notion.com/p/3ff0fcd116138108a06fc6f8acf469fc">PROJECT 01 - 매출/정산 및 입금 대사 자동화 시스템</page>
 	</column>
 </columns>
 
