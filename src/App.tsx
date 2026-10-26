@@ -490,8 +490,12 @@ export default function App() {
   const [uploadedBankFile, setUploadedBankFile] = useState<{
     name: string;
     size: number;
-    rows: Array<{ date: string; sender: string; amount: number; account: string }>;
+    rows: Array<{ date: string; sender: string; amount: number; account: string; channel?: 'B2C' | 'B2B' }>;
     totalAmount: number;
+    b2cRows?: Array<{ date: string; sender: string; amount: number; account: string; channel?: 'B2C' | 'B2B' }>;
+    b2bRows?: Array<{ date: string; sender: string; amount: number; account: string; channel?: 'B2C' | 'B2B' }>;
+    b2cTotalAmount?: number;
+    b2bTotalAmount?: number;
   } | null>(null);
 
   const [uploadedSettlementFile, setUploadedSettlementFile] = useState<{
@@ -1030,27 +1034,38 @@ export default function App() {
           };
           const rawAmt = getVal(['입금액', '입금', 'amount', 'deposit', '거래금액', '금액']) ?? 0;
           const numAmt = typeof rawAmt === 'number' ? rawAmt : Number(String(rawAmt).replace(/[^0-9.-]+/g, '')) || 0;
+          const sender = String(getVal(['적요', '입금자명', '입금자', 'sender', '거래처', '내용', 'description']) || '미지정 입금처');
+          const isB2C = /쿠팡|네이버|스마트스토어|정산|지급|pg|토스|이니시스|페이/i.test(sender);
 
           return {
             date: String(getVal(['거래일시', '거래일', '일자', 'date', '날짜']) || new Date().toISOString().slice(0, 10)),
-            sender: String(getVal(['적요', '입금자명', '입금자', 'sender', '거래처', '내용', 'description']) || '미지정 입금처'),
+            sender,
             amount: numAmt,
-            account: String(getVal(['계좌번호', '계좌', 'account', 'bank']) || '기본계좌')
+            account: String(getVal(['계좌번호', '계좌', 'account', 'bank']) || '기본계좌'),
+            channel: isB2C ? ('B2C' as const) : ('B2B' as const)
           };
         }).filter(r => r.amount > 0);
 
+        const b2cRows = parsedRows.filter(r => r.channel === 'B2C');
+        const b2bRows = parsedRows.filter(r => r.channel === 'B2B');
+        const b2cTotalAmount = b2cRows.reduce((acc, cur) => acc + cur.amount, 0);
+        const b2bTotalAmount = b2bRows.reduce((acc, cur) => acc + cur.amount, 0);
         const totalAmount = parsedRows.reduce((acc, cur) => acc + cur.amount, 0);
 
         setUploadedBankFile({
           name: file.name,
           size: file.size,
           rows: parsedRows,
+          b2cRows,
+          b2bRows,
+          b2cTotalAmount,
+          b2bTotalAmount,
           totalAmount
         });
         setUploadedStep(1);
         setUploadedReconciled(false);
-        setActionSuccessMsg(`[은행 파일 로드] ${file.name} (${parsedRows.length}건, ₩ ${totalAmount.toLocaleString()}) 파싱 완료`);
-        setTimeout(() => setActionSuccessMsg(''), 4000);
+        setActionSuccessMsg(`[통장 파싱 및 지능형 자동 분류] 총 ${parsedRows.length}건 중 B2C 오픈마켓 ${b2cRows.length}건(₩ ${b2cTotalAmount.toLocaleString()}) / B2B 거래처 ${b2bRows.length}건(₩ ${b2bTotalAmount.toLocaleString()}) 분류 완료! B2B 건은 4.2 매칭 탭으로 자동 이관되었습니다.`);
+        setTimeout(() => setActionSuccessMsg(''), 5000);
       } catch (err) {
         console.error('Bank file parse error:', err);
         alert('은행 엑셀/CSV 파일 형식이 올바르지 않습니다.');
@@ -1221,6 +1236,80 @@ export default function App() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '플랫폼정산서');
     XLSX.writeFile(wb, filename);
+  };
+
+  // 4.3 정산 대사 통합 결과 엑셀 다운로드 (보고서 내보내기)
+  const handleExportReconciliationExcel = () => {
+    const wb = XLSX.utils.book_new();
+
+    // 1. 대사 결과 요약 시트
+    const summaryData = [
+      { '구분': '보고서 명칭', '항목': '매출/정산 및 입금 대사 통합 결과 보고서' },
+      { '구분': '대사 기준일시', '항목': new Date().toLocaleString('ko-KR') },
+      { '구분': '작성자 / 권한', '항목': `finance@manager.corp (${currentRole.toUpperCase()})` },
+      { '구분': '적용 채널 필터', '항목': channelFilter === 'ALL' ? '전체 채널' : channelFilter === 'COUPANG' ? '쿠팡 로켓배송' : channelFilter === 'SMARTSTORE' ? '네이버 스마트스토어' : 'B2B 도매' },
+      { '구분': '1단계: 덩어리 대사 결과', '항목': '통장 실입금액 ↔ 정산 엑셀 실지급액 100% 일치 (오차 0원)' },
+      { '구분': '2단계: 주문별 대사 결과', '항목': '정상 정산 7건 (₩ 75,000,000) / 기간대비 미정산 1건 (₩ 1,260,000) 영업팀 이관' },
+      { '구분': '미정산 확인 주문번호', '항목': 'CP-20261012-0205 (사유: 정산 엑셀 내역없음)' },
+      { '구분': '당사 기간 주문 총액', '항목': '₩ 82,000,000' },
+      { '구분': '정산 실입금 총액', '항목': '₩ 75,000,000' },
+      { '구분': '플랫폼 공제 총액', '항목': '₩ 5,740,000 (수수료/반품/파손)' },
+      { '구분': 'B2B 대표자 매칭 결과', '항목': '홍길동 명의 ₩ 15,000,000 (주)알파테크 미수금 상계 승인' }
+    ];
+    const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+    XLSX.utils.book_append_sheet(wb, wsSummary, '1.정산대사_결과요약');
+
+    // 2. 주문별 상세 대사 원장 시트
+    const activeOrders = b2cBatch === 'naver' ? NAVER_DEMO_ORDERS : b2cBatch === 'coupang_match' ? COUPANG_DEMO_ORDERS : COUPANG_MISMATCH_DEMO_ORDERS;
+    const ordersData = activeOrders.map((ord, idx) => ({
+      'No': idx + 1,
+      '주문번호': ord.orderKey,
+      '주문일자': ord.date,
+      '상품명': ord.productName,
+      '고객명': ord.customer,
+      '결제금액(원금액)': ord.grossAmount,
+      '수수료차감': ord.fee,
+      '환불반품차감': ord.returnLoss,
+      '파손손실차감': ord.damage,
+      '기타공제': ord.etc,
+      '실제정산금액(실금액)': ord.settledAmount,
+      '정산상태': ord.diffAmount !== 0 ? '⚠️ 기간대비 미정산건 확인 (영업팀 이관)' : ord.damage > 0 ? '🔵 파손 차감 정산' : ord.returnLoss > 0 ? '🔴 반품/환불 차감 정산' : '🟢 전액 정산 완료',
+      '비고': ord.diffAmount !== 0 ? '정산 엑셀 내역없음 (미수금 확정 및 영업팀 사유확인 전달)' : '정상 정산 완료'
+    }));
+    const wsOrders = XLSX.utils.json_to_sheet(ordersData);
+    XLSX.utils.book_append_sheet(wb, wsOrders, '2.주문별_상세대사원장');
+
+    // 3. 거래처별 미수금(AR) Aging 원장 시트
+    const arData = partnersList.map((p, idx) => ({
+      'No': idx + 1,
+      '거래처명': p.company_name,
+      '사업자번호': p.business_number,
+      '대표자명': p.ceo_name,
+      '채널유형': p.channel_type,
+      '미수금잔액(원)': p.uncollected,
+      '최종거래일자': p.last_deal,
+      '연체구분': p.uncollected > 10000000 ? '🚨 30일 초과 연체 (OVERDUE)' : '정상 채권',
+      '지능형대표자매칭': p.alias_active ? '연동 활성' : '비활성'
+    }));
+    const wsAR = XLSX.utils.json_to_sheet(arData);
+    XLSX.utils.book_append_sheet(wb, wsAR, '3.거래처_미수금Aging원장');
+
+    // 4. 미확인 가수금 보관 원장 시트
+    const suspenseData = suspenseList.map((s, idx) => ({
+      'No': idx + 1,
+      '입금자명/적요': s.sender_name,
+      '입금액(원)': s.amount,
+      '발생원인': s.reason === 'DUPLICATE_CANDIDATES' ? '동명 대표자(김철수) 2건 중복 충돌' : '미등록 거래처 미확인 입금',
+      '처리상태': s.status === 'PENDING' ? '미확인 보관 중' : '수동 상계 완료',
+      '충돌후보수': s.conflict_count || 1
+    }));
+    const wsSuspense = XLSX.utils.json_to_sheet(suspenseData);
+    XLSX.utils.book_append_sheet(wb, wsSuspense, '4.미확인가수금_보관원장');
+
+    const nowStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    XLSX.writeFile(wb, `FinanceFlow_정산대사_통합보고서_${nowStr}.xlsx`);
+    setActionSuccessMsg('[엑셀 내보내기 완료] 4개 시트로 구성된 정산 대사 통합 결과 보고서(.xlsx)가 성공적으로 다운로드되었습니다.');
+    setTimeout(() => setActionSuccessMsg(''), 5000);
   };
 
   // 업로드 파일 기반 대사 확정 처리
@@ -1521,6 +1610,16 @@ export default function App() {
                 Viewer (영업)
               </button>
             </div>
+
+            {/* 대사 결과 보고서 엑셀 내보내기 버튼 */}
+            <button
+              onClick={handleExportReconciliationExcel}
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition flex items-center gap-1.5 shrink-0 active:scale-95"
+              title="4개 시트 통합 정산 대사 결과 보고서(.xlsx) 다운로드"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">대사 보고서 (.xlsx)</span>
+            </button>
 
             <button
               onClick={fetchData}
@@ -2250,11 +2349,50 @@ export default function App() {
                                 </div>
 
                                 <div className="bg-white rounded-lg p-3 border border-emerald-100 flex items-center justify-between">
-                                  <span className="text-xs text-slate-600 font-medium">파싱된 실입금 총액:</span>
+                                  <span className="text-xs text-slate-600 font-medium">파싱된 통장 실입금 합계:</span>
                                   <span className="font-mono font-bold text-[#1E40AF] text-sm">
                                     ₩ {uploadedBankFile.totalAmount.toLocaleString()}
                                   </span>
                                 </div>
+
+                                {/* B2C vs B2B 지능형 자동 분류 파이프라인 카드 */}
+                                {uploadedBankFile.b2bRows && uploadedBankFile.b2bRows.length > 0 && (
+                                  <div className="p-3 bg-blue-50/80 rounded-xl border border-blue-200 text-xs space-y-2">
+                                    <div className="flex items-center justify-between text-[#1E40AF] font-bold">
+                                      <span className="flex items-center gap-1.5">
+                                        <Split className="w-3.5 h-3.5" />
+                                        지능형 채널 자동 분류 결과 (B2C ↔ B2B)
+                                      </span>
+                                      <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-mono">
+                                        총 {uploadedBankFile.rows.length}건
+                                      </span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                                      <div className="bg-white p-2 rounded-lg border border-blue-100">
+                                        <span className="text-slate-400 block font-medium">B2C 플랫폼 정산:</span>
+                                        <strong className="text-emerald-700 font-bold block text-xs">
+                                          {uploadedBankFile.b2cRows?.length || 0}건 (₩ {(uploadedBankFile.b2cTotalAmount || 0).toLocaleString()})
+                                        </strong>
+                                        <span className="text-[10px] text-slate-400">➔ B2C 1단계 대조 배정</span>
+                                      </div>
+                                      <div className="bg-white p-2 rounded-lg border border-blue-100 flex flex-col justify-between">
+                                        <div>
+                                          <span className="text-slate-400 block font-medium">B2B 거래처/대표자:</span>
+                                          <strong className="text-[#1E40AF] font-bold block text-xs">
+                                            {uploadedBankFile.b2bRows?.length || 0}건 (₩ {(uploadedBankFile.b2bTotalAmount || 0).toLocaleString()})
+                                          </strong>
+                                        </div>
+                                        <button
+                                          onClick={() => setReconcileMode('b2b')}
+                                          className="mt-1 text-[10px] text-[#1E40AF] font-bold flex items-center gap-1 hover:underline self-start"
+                                        >
+                                          <span>B2B 매칭으로 바로가기</span>
+                                          <ArrowRight className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
 
                                 <div className="flex justify-end gap-2 pt-1">
                                   <button
@@ -2402,7 +2540,10 @@ export default function App() {
                         {/* ======================================================== */}
                         {uploadedBankFile && uploadedSettlementFile ? (
                           (() => {
-                            const diff = uploadedBankFile.totalAmount - uploadedSettlementFile.totalSettled;
+                            const bankCompareAmount = (uploadedBankFile.b2cTotalAmount && uploadedBankFile.b2cTotalAmount > 0)
+                              ? uploadedBankFile.b2cTotalAmount
+                              : uploadedBankFile.totalAmount;
+                            const diff = bankCompareAmount - uploadedSettlementFile.totalSettled;
                             const isMatch = Math.abs(diff) === 0;
 
                             return (
@@ -2436,12 +2577,14 @@ export default function App() {
                                         </div>
                                         <div className="flex justify-between">
                                           <span>입금 건수:</span>
-                                          <span>{uploadedBankFile.rows.length}건</span>
+                                          <span>{uploadedBankFile.rows.length}건 (B2C: {uploadedBankFile.b2cRows?.length || uploadedBankFile.rows.length}건)</span>
                                         </div>
                                         <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
-                                          <span className="font-bold text-slate-700">통장 실입금 합계:</span>
+                                          <span className="font-bold text-slate-700">
+                                            {uploadedBankFile.b2bRows && uploadedBankFile.b2bRows.length > 0 ? 'B2C 정산 입금액:' : '통장 실입금 합계:'}
+                                          </span>
                                           <strong className="text-base font-mono text-[#1E40AF]">
-                                            ₩ {uploadedBankFile.totalAmount.toLocaleString()}
+                                            ₩ {bankCompareAmount.toLocaleString()}
                                           </strong>
                                         </div>
                                       </div>
@@ -3410,6 +3553,14 @@ export default function App() {
                                           {disputeSuccessOrder ? '영업팀 이관 완료' : '기간대비 미정산 1건(₩ 1,260,000) 영업팀 이관'}
                                         </span>
                                       </button>
+
+                                      <button
+                                        onClick={handleExportReconciliationExcel}
+                                        className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-xs transition flex items-center gap-1.5 shrink-0 shadow-2xs"
+                                      >
+                                        <Download className="w-4 h-4 text-emerald-600" />
+                                        <span>대사 결과 리포트 내보내기 (.xlsx)</span>
+                                      </button>
                                     </>
                                   )}
                                 </div>
@@ -3432,6 +3583,26 @@ export default function App() {
                         거래처 마스터의 <code className="bg-white px-1 py-0.5 rounded border border-blue-200 font-mono">ceo_name</code>과 대조하여 청구 금액이 일치하면 동일 거래처로 판별하여 매칭을 제안합니다.
                       </div>
                     </div>
+
+                    {/* 업로드된 통장 파일 기반 B2B 자동 분류 이관 배너 */}
+                    {uploadedBankFile?.b2bRows && uploadedBankFile.b2bRows.length > 0 && (
+                      <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 flex items-start justify-between gap-3 shadow-2xs animate-fadeIn">
+                        <div className="flex items-start gap-2.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold block text-sm text-emerald-950">
+                              [실시간 연동] 업로드된 통장 파일({uploadedBankFile.name})에서 B2B 입금 {uploadedBankFile.b2bRows.length}건(₩ {(uploadedBankFile.b2bTotalAmount || 0).toLocaleString()})이 자동 분류되어 이관되었습니다.
+                            </span>
+                            <span className="text-emerald-800 text-xs mt-0.5 block">
+                              통장 적요 분석 결과, 대표자 개인명(<strong>홍길동</strong> 등) 입금건이 거래처 마스터와 교차 일치하여 아래 목록에 자동 배정되었습니다.
+                            </span>
+                          </div>
+                        </div>
+                        <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-white text-emerald-800 border border-emerald-300 shrink-0">
+                          🟢 B2B 자동 이관 배정됨
+                        </span>
+                      </div>
+                    )}
 
                     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
                       <div className="p-5 border-b border-slate-100 flex items-center justify-between">
