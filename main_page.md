@@ -71,7 +71,8 @@ title: Finance & Accounting Portfolio
 		<empty-block/>
 		- **해결 과제**: 다채널(쇼핑몰·B2B) 입금 내역과 매출 원장의 수작업 대조 병목 해결
 		- **핵심 솔루션**: 2단계 룰 기반 매칭 엔진 + 거래처 대표자명 교차 매핑 + 동명 충돌 방지 안전장치
-		- **기술 스택**: `React` `TypeScript` `Supabase` &nbsp;•&nbsp; **상태**: `프로토타입 개발 진행 중`
+		- **기술 스택**: `React` `TypeScript` `Tailwind CSS` `Supabase` &nbsp;•&nbsp; **상태**: `✅ 개발 및 배포 완료 (Live Demo 운영)`
+		- **링크 바로가기**: [🌐 Live Demo (웹 배포 링크)](https://github.com/EunheeRoH91/project_neh_1) &nbsp;|&nbsp; [📂 GitHub 저장소](https://github.com/EunheeRoH91/project_neh_1)
 		<empty-block/>
 		<page url="https://app.notion.com/p/3ff0fcd116138108a06fc6f8acf469fc">PROJECT 01 - 매출/정산 및 입금 대사 자동화 시스템</page>
 	</column>

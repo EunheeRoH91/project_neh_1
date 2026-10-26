@@ -27,7 +27,17 @@ title: PROJECT 01 — 매출/정산 및 입금 대사 자동화 시스템
 	</column>
 	<column ratio="25">
 		**현재 상태**
-		프로토타입 개발 진행 중 (Phase 1~2)
+		✅ 개발 및 배포 완료 (Live Demo 운영)
+	</column>
+</columns>
+
+<empty-block/>
+
+<columns>
+	<column ratio="100">
+		> **Live Service & Source Code**
+		> - 🌐 **배포 사이트**: [Live Demo 바로가기](https://github.com/EunheeRoH91/project_neh_1) (Vercel 배포 완료)
+		> - 📂 **소스 코드 저장소**: [GitHub Repository (EunheeRoH91/project_neh_1)](https://github.com/EunheeRoH91/project_neh_1)
 	</column>
 </columns>
 
@@ -193,23 +203,23 @@ title: PROJECT 01 — 매출/정산 및 입금 대사 자동화 시스템
 	<column ratio="25">
 		**Phase 2**
 		<empty-block/>
-		🔄 대사 엔진 구현
+		✅ 대사 엔진 구현
 		<empty-block/>
-		<span color="gray">엑셀 파서 및 B2C 2-Step / B2B 대표자명 매칭 로직 개발 중</span>
+		<span color="gray">통장 B2C/B2B 자동 분류 파서, 2-Step 매칭 및 대표자 교차 매칭 완료</span>
 	</column>
 	<column ratio="25">
 		**Phase 3**
 		<empty-block/>
-		📅 예외 처리 UI
+		✅ 예외 처리 & 리스크 관리 UI
 		<empty-block/>
-		<span color="gray">동명 거래처 충돌 모달 및 미확인 가수금 관리함 화면 연동</span>
+		<span color="gray">동명 거래처 충돌 모달, 미확인 가수금 보관함, 미정산건 영업팀 이관 및 사후 조치(차월정산/대손상각) 완료</span>
 	</column>
 	<column ratio="25">
 		**Phase 4**
 		<empty-block/>
-		📅 대시보드 리포팅
+		✅ 대시보드 리포팅 & 엑셀 내보내기
 		<empty-block/>
-		<span color="gray">미수금 Aging 테이블 및 리스크 시계열 차트 연동</span>
+		<span color="gray">미수금 Aging 테이블, 리스크 시계열 차트, 4개 시트 전문 대사 보고서(.xlsx) 내보내기 완료</span>
 	</column>
 </columns>
 

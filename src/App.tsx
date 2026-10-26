@@ -484,6 +484,7 @@ export default function App() {
   const [b2bReconciledIds, setB2bReconciledIds] = useState<string[]>([]);
   const [checkedOrderKeys, setCheckedOrderKeys] = useState<Record<string, boolean>>({});
   const [disputeSuccessOrder, setDisputeSuccessOrder] = useState<string | null>(null);
+  const [disputeResolution, setDisputeResolution] = useState<'COLLECTED' | 'WRITTEN_OFF' | null>(null);
   const [partialApproved, setPartialApproved] = useState<boolean>(false);
 
   // 4.1 실제 엑셀/CSV 드래그 앤 드롭 업로드 및 파싱 상태
@@ -1281,21 +1282,32 @@ export default function App() {
 
     // 2. 주문별 상세 대사 원장 시트
     const activeOrders = b2cBatch === 'naver' ? NAVER_DEMO_ORDERS : b2cBatch === 'coupang_match' ? COUPANG_DEMO_ORDERS : COUPANG_MISMATCH_DEMO_ORDERS;
-    const ordersData: any[] = activeOrders.map((ord, idx) => ({
-      'No': idx + 1,
-      '주문번호': ord.orderKey,
-      '주문일자': ord.date,
-      '상품명': ord.productName,
-      '고객명': ord.customer,
-      '결제금액(원금액)': ord.grossAmount,
-      '수수료차감': ord.fee,
-      '환불반품차감': ord.returnLoss,
-      '파손손실차감': ord.damage,
-      '기타공제': ord.etc,
-      '실제정산금액(실금액)': ord.settledAmount,
-      '정산상태': ord.diffAmount !== 0 ? '⚠️ 기간대비 미정산건 확인 (영업팀 이관)' : ord.damage > 0 ? '🔵 파손 차감 정산' : ord.returnLoss > 0 ? '🔴 반품/환불 차감 정산' : '🟢 전액 정산 완료',
-      '비고 및 조치사항': ord.diffAmount !== 0 ? '정산 엑셀 내역없음 (미수금 확정 및 영업팀 사유확인 전달)' : '정상 정산 완료'
-    }));
+    const ordersData: any[] = activeOrders.map((ord, idx) => {
+      const isDispute = ord.diffAmount !== 0;
+      const settledAmt = isDispute && disputeResolution === 'COLLECTED' ? ord.grossAmount : ord.settledAmount;
+      const statusStr = isDispute
+        ? (disputeResolution === 'COLLECTED' ? '🟢 차월 정산 반영 (회수 완료)' : disputeResolution === 'WRITTEN_OFF' ? '⚪ 대손 상각 종결 (손실 확정)' : '⚠️ 기간대비 미정산건 확인 (영업팀 이관)')
+        : (ord.damage > 0 ? '🔵 파손 차감 정산' : ord.returnLoss > 0 ? '🔴 반품/환불 차감 정산' : '🟢 전액 정산 완료');
+      const noteStr = isDispute
+        ? (disputeResolution === 'COLLECTED' ? '차월 정산 실입금 확인되어 전액 회수 종결' : disputeResolution === 'WRITTEN_OFF' ? '영업팀 확인에 따른 대손 상각 처리(손실 반영)' : '정산 엑셀 내역없음 (미수금 확정 및 영업팀 사유확인 전달)')
+        : '정상 정산 완료';
+
+      return {
+        'No': idx + 1,
+        '주문번호': ord.orderKey,
+        '주문일자': ord.date,
+        '상품명': ord.productName,
+        '고객명': ord.customer,
+        '결제금액(원금액)': ord.grossAmount,
+        '수수료차감': ord.fee,
+        '환불반품차감': ord.returnLoss,
+        '파손손실차감': ord.damage,
+        '기타공제': ord.etc,
+        '실제정산금액(실금액)': settledAmt,
+        '정산상태': statusStr,
+        '비고 및 조치사항': noteStr
+      };
+    });
 
     // 하단 [합계] 행 추가
     const sumGross = activeOrders.reduce((sum, o) => sum + o.grossAmount, 0);
@@ -1303,7 +1315,7 @@ export default function App() {
     const sumReturn = activeOrders.reduce((sum, o) => sum + o.returnLoss, 0);
     const sumDamage = activeOrders.reduce((sum, o) => sum + o.damage, 0);
     const sumEtc = activeOrders.reduce((sum, o) => sum + o.etc, 0);
-    const sumSettled = activeOrders.reduce((sum, o) => sum + o.settledAmount, 0);
+    const sumSettled = activeOrders.reduce((sum, o) => sum + (o.diffAmount !== 0 && disputeResolution === 'COLLECTED' ? o.grossAmount : o.settledAmount), 0);
 
     ordersData.push({
       'No': '합계',
@@ -2934,6 +2946,7 @@ export default function App() {
                                 setB2cReconciled(false);
                                 setPartialApproved(false);
                                 setDisputeSuccessOrder(null);
+                                setDisputeResolution(null);
                                 setCheckedOrderKeys({});
                               }}
                               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
@@ -2951,6 +2964,7 @@ export default function App() {
                                 setB2cReconciled(false);
                                 setPartialApproved(false);
                                 setDisputeSuccessOrder(null);
+                                setDisputeResolution(null);
                                 setCheckedOrderKeys({});
                               }}
                               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
@@ -2968,6 +2982,7 @@ export default function App() {
                                 setB2cReconciled(false);
                                 setPartialApproved(false);
                                 setDisputeSuccessOrder(null);
+                                setDisputeResolution(null);
                                 setCheckedOrderKeys({});
                               }}
                               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
@@ -3459,7 +3474,11 @@ export default function App() {
                                               )}
                                             </td>
                                             <td className="px-3 py-2.5 text-right font-mono whitespace-nowrap">
-                                              {ord.settledAmount > 0 ? (
+                                              {hasDiff && disputeResolution === 'COLLECTED' ? (
+                                                <span className="font-bold text-emerald-700">
+                                                  ₩ {ord.grossAmount.toLocaleString()}
+                                                </span>
+                                              ) : ord.settledAmount > 0 ? (
                                                 <span className="font-bold text-emerald-700">
                                                   ₩ {ord.settledAmount.toLocaleString()}
                                                 </span>
@@ -3469,11 +3488,21 @@ export default function App() {
                                             </td>
                                             <td className="px-4 py-2.5 text-center whitespace-nowrap">
                                               {hasDiff ? (
-                                                <span 
-                                                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap"
-                                                >
-                                                  ⚠️ 기간대비 미정산건 확인 (영업팀 이관)
-                                                </span>
+                                                disputeResolution === 'COLLECTED' ? (
+                                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                                                    🟢 차월 정산 반영 (회수 완료)
+                                                  </span>
+                                                ) : disputeResolution === 'WRITTEN_OFF' ? (
+                                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-300 whitespace-nowrap">
+                                                    ⚪ 대손 상각 종결 (손실 확정)
+                                                  </span>
+                                                ) : (
+                                                  <span 
+                                                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap"
+                                                  >
+                                                    ⚠️ 기간대비 미정산건 확인 (영업팀 이관)
+                                                  </span>
+                                                )
                                               ) : ord.damage > 0 ? (
                                                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-200 whitespace-nowrap">
                                                   🔵 파손 차감 정산
@@ -3508,10 +3537,16 @@ export default function App() {
                                           - ₩ {filteredDemoList.reduce((sum, o) => sum + (o.returnLoss + o.damage), 0).toLocaleString()}
                                         </td>
                                         <td className="px-3 py-2.5 text-right font-mono text-emerald-700 whitespace-nowrap">
-                                          ₩ {filteredDemoList.reduce((sum, o) => sum + o.settledAmount, 0).toLocaleString()}
+                                          ₩ {(filteredDemoList.reduce((sum, o) => sum + o.settledAmount, 0) + (hasMissingOrder && disputeResolution === 'COLLECTED' ? 1260000 : 0)).toLocaleString()}
                                         </td>
                                         <td className="px-4 py-2.5 text-center text-slate-500 font-normal whitespace-nowrap">
-                                          {totalDiff !== 0 ? '7건 정산 완료 / 1건 미정산' : '전건 정상 정산 완료'}
+                                          {disputeResolution === 'COLLECTED'
+                                            ? '전건 회수/정산 종결 완료 (8건)'
+                                            : disputeResolution === 'WRITTEN_OFF'
+                                            ? '7건 정산 완료 / 1건 대손 상각 종결'
+                                            : totalDiff !== 0
+                                            ? '7건 정산 완료 / 1건 미정산'
+                                            : '전건 정상 정산 완료'}
                                         </td>
                                       </tr>
                                     </tfoot>
@@ -3599,35 +3634,111 @@ export default function App() {
                                         </span>
                                       </button>
 
-                                      <button
-                                        disabled={disputeSuccessOrder !== null || currentRole === 'viewer'}
-                                        onClick={() => {
-                                          setDisputeSuccessOrder('CP-20261012-0205');
-                                          const newAudit = {
-                                            id: `a-${Date.now()}`,
-                                            action_type: 'AR_MISMATCH_RECORD',
-                                            target_id: 'CP-20261012-0205',
-                                            actor_email: 'finance@manager.corp',
-                                            actor_role: currentRole,
-                                            memo: '주문 CP-20261012-0205 기간대비 미정산건 확인 (영업팀 이관)',
-                                            amount: 1260000,
-                                            created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
-                                          };
-                                          setAuditLogs(prev => [newAudit, ...prev]);
-                                          setActionSuccessMsg('[영업팀 이관 완료] 기간대비 미정산건(CP-20261012-0205, ₩ 1,260,000)이 영업팀으로 정상 이관되었습니다.');
-                                          setTimeout(() => setActionSuccessMsg(''), 5000);
-                                        }}
-                                        className={`px-5 py-2.5 rounded-xl text-white font-bold text-xs shadow-md transition flex items-center gap-2 active:scale-95 ${
-                                          disputeSuccessOrder
-                                            ? 'bg-slate-400 cursor-not-allowed'
-                                            : 'bg-rose-600 hover:bg-rose-700 shadow-rose-900/20'
-                                        }`}
-                                      >
-                                        <AlertTriangle className="w-4 h-4" />
-                                        <span>
-                                          {disputeSuccessOrder ? '영업팀 이관 완료' : '기간대비 미정산 1건(₩ 1,260,000) 영업팀 이관'}
-                                        </span>
-                                      </button>
+                                      {disputeSuccessOrder === null ? (
+                                        <button
+                                          disabled={currentRole === 'viewer'}
+                                          onClick={() => {
+                                            setDisputeSuccessOrder('CP-20261012-0205');
+                                            const newAudit = {
+                                              id: `a-${Date.now()}`,
+                                              action_type: 'AR_MISMATCH_RECORD',
+                                              target_id: 'CP-20261012-0205',
+                                              actor_email: 'finance@manager.corp',
+                                              actor_role: currentRole,
+                                              memo: '주문 CP-20261012-0205 기간대비 미정산건 확인 (영업팀 이관)',
+                                              amount: 1260000,
+                                              created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+                                            };
+                                            setAuditLogs(prev => [newAudit, ...prev]);
+                                            setActionSuccessMsg('[영업팀 이관 완료] 기간대비 미정산건(CP-20261012-0205, ₩ 1,260,000)이 영업팀으로 정상 이관되었습니다.');
+                                            setTimeout(() => setActionSuccessMsg(''), 5000);
+                                          }}
+                                          className="px-5 py-2.5 rounded-xl text-white font-bold text-xs shadow-md bg-rose-600 hover:bg-rose-700 shadow-rose-900/20 transition flex items-center gap-2 active:scale-95"
+                                        >
+                                          <AlertTriangle className="w-4 h-4" />
+                                          <span>기간대비 미정산 1건(₩ 1,260,000) 영업팀 이관</span>
+                                        </button>
+                                      ) : disputeResolution === null ? (
+                                        <div className="flex flex-wrap items-center gap-2 bg-amber-50/80 p-1.5 rounded-xl border border-amber-200">
+                                          <span className="text-[11px] font-bold text-amber-900 px-2 flex items-center gap-1">
+                                            <Clock className="w-3.5 h-3.5 text-amber-600" />
+                                            영업팀 확인 후 사후 조치:
+                                          </span>
+                                          <button
+                                            disabled={currentRole === 'viewer'}
+                                            onClick={() => {
+                                              setDisputeResolution('COLLECTED');
+                                              setSalesRecords(prev => prev.map(s => s.order_key === 'CP-20261012-0205' ? { ...s, status: 'PAID' } : s));
+                                              const newAudit = {
+                                                id: `a-${Date.now()}`,
+                                                action_type: 'DISPUTE_COLLECTED',
+                                                target_id: 'CP-20261012-0205',
+                                                actor_email: 'finance@manager.corp',
+                                                actor_role: currentRole,
+                                                memo: '미정산건(CP-20261012-0205) 차월 정산 실입금 반영 확인으로 전액 회수 종결',
+                                                amount: 1260000,
+                                                created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+                                              };
+                                              setAuditLogs(prev => [newAudit, ...prev]);
+                                              setActionSuccessMsg('[회수 종결] 미정산건(CP-20261012-0205, ₩ 1,260,000)이 차월 정산 입금으로 확인되어 정상 회수 종결되었습니다.');
+                                              setTimeout(() => setActionSuccessMsg(''), 5000);
+                                            }}
+                                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition flex items-center gap-1.5 active:scale-95"
+                                          >
+                                            <CheckCheck className="w-3.5 h-3.5" />
+                                            <span>차월 정산 입금 반영 (회수 종결)</span>
+                                          </button>
+                                          <button
+                                            disabled={currentRole === 'viewer'}
+                                            onClick={() => {
+                                              setDisputeResolution('WRITTEN_OFF');
+                                              const newAudit = {
+                                                id: `a-${Date.now()}`,
+                                                action_type: 'DISPUTE_WRITTEN_OFF',
+                                                target_id: 'CP-20261012-0205',
+                                                actor_email: 'finance@manager.corp',
+                                                actor_role: currentRole,
+                                                memo: '미정산건(CP-20261012-0205) 영업팀 소명 불가 확인에 따른 대손 상각 처리(손실 확정 종결)',
+                                                amount: 1260000,
+                                                created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+                                              };
+                                              setAuditLogs(prev => [newAudit, ...prev]);
+                                              setActionSuccessMsg('[손실 확정] 미정산건(CP-20261012-0205, ₩ 1,260,000)을 대손 상각 처리하여 손실 확정 및 장부 종결하였습니다.');
+                                              setTimeout(() => setActionSuccessMsg(''), 5000);
+                                            }}
+                                            className="px-3 py-1.5 rounded-lg bg-slate-600 hover:bg-slate-700 text-white font-bold text-xs shadow-xs transition flex items-center gap-1.5 active:scale-95"
+                                          >
+                                            <FileSpreadsheet className="w-3.5 h-3.5" />
+                                            <span>대손 상각 처리 (손실 확정)</span>
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center gap-2">
+                                          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border ${
+                                            disputeResolution === 'COLLECTED'
+                                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                              : 'bg-slate-100 text-slate-700 border-slate-300'
+                                          }`}>
+                                            {disputeResolution === 'COLLECTED' ? (
+                                              <>
+                                                <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
+                                                <span>차월 정산 회수 종결됨 (₩ 1,260,000 입금 완료)</span>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <CheckCircle2 className="w-3.5 h-3.5 text-slate-500" />
+                                                <span>대손 상각 종결 완료 (₩ 1,260,000 손실 확정)</span>
+                                              </>
+                                            )}
+                                          </span>
+                                          <button
+                                            onClick={() => setDisputeResolution(null)}
+                                            className="text-[11px] text-slate-500 hover:text-slate-800 underline px-1"
+                                          >
+                                            조치 변경
+                                          </button>
+                                        </div>
+                                      )}
 
                                       <button
                                         onClick={handleExportReconciliationExcel}
