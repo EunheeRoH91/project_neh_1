@@ -1244,7 +1244,7 @@ export default function App() {
   const handleExportReconciliationExcel = () => {
     const wb = XLSX.utils.book_new();
 
-    // 엑셀 서식 헬퍼 함수 (열 너비 자동 확보 및 숫자 천단위 콤마 서식)
+    // 엑셀 서식 적용 함수 (열 너비 자동 확장 및 천 단위 콤마 서식)
     const applySheetFormatting = (ws: XLSX.WorkSheet, colWidths: number[]) => {
       ws['!cols'] = colWidths.map(w => ({ wch: w }));
       const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
@@ -1259,42 +1259,112 @@ export default function App() {
       }
     };
 
+    const activeOrders = b2cBatch === 'naver' ? NAVER_DEMO_ORDERS : b2cBatch === 'coupang_match' ? COUPANG_DEMO_ORDERS : COUPANG_MISMATCH_DEMO_ORDERS;
+    const platformName = b2cBatch === 'naver' ? '네이버 스마트스토어' : '쿠팡 로켓배송';
+    const reportMonth = '2026년 10월';
+
+    const sumGross = activeOrders.reduce((sum, o) => sum + o.grossAmount, 0);
+    const sumFee = activeOrders.reduce((sum, o) => sum + o.fee, 0);
+    const sumReturn = activeOrders.reduce((sum, o) => sum + o.returnLoss, 0);
+    const sumDamage = activeOrders.reduce((sum, o) => sum + o.damage, 0);
+    const sumEtc = activeOrders.reduce((sum, o) => sum + o.etc, 0);
+    const sumSettled = activeOrders.reduce((sum, o) => sum + (o.diffAmount !== 0 && disputeResolution === 'COLLECTED' ? o.grossAmount : o.settledAmount), 0);
+
     // 1. 대사 결과 요약 시트
     const summaryData = [
-      { '구분': '보고서 명칭', '항목/내용': '매출/정산 및 입금 대사 통합 결과 보고서' },
+      { '구분': '보고서 명칭', '항목/내용': `${reportMonth} 매출/정산 및 입금 대사 통합 결과 보고서` },
+      { '구분': '정산 대상 기간 (귀속월)', '항목/내용': '2026년 10월 01일 ~ 2026년 10월 31일 (2026년 10월 귀속)' },
+      { '구분': '정산 대상 플랫폼', '항목/내용': platformName },
       { '구분': '대사 기준일시', '항목/내용': new Date().toLocaleString('ko-KR') },
-      { '구분': '작성자 / 권한', '항목/내용': `finance@manager.corp (${currentRole.toUpperCase()})` },
+      { '구분': '대사 담당 부서 / 작성자', '항목/내용': `자금팀 finance@manager.corp (${currentRole.toUpperCase()})` },
       { '구분': '적용 채널 필터', '항목/내용': channelFilter === 'ALL' ? '전체 채널' : channelFilter === 'COUPANG' ? '쿠팡 로켓배송' : channelFilter === 'SMARTSTORE' ? '네이버 스마트스토어' : 'B2B 도매' },
       { '구분': '------------------------', '항목/내용': '------------------------------------------------------------' },
-      { '구분': '1단계: 덩어리 대사 결과', '항목/내용': '통장 실입금액(₩ 75,000,000) ↔ 정산 엑셀 실지급액(₩ 75,000,000) 100% 일치' },
-      { '구분': '2단계: 주문별 대사 결과', '항목/내용': '정상 정산 7건 (₩ 75,000,000) / 기간대비 미정산 1건 (₩ 1,260,000) 영업팀 이관' },
-      { '구분': '미정산 확인 주문번호', '항목/내용': 'CP-20261012-0205 (사유: 정산 엑셀 내역없음)' },
+      { '구분': '1단계: 통장 덩어리 대사 결과', '항목/내용': `통장 실입금액(₩ ${(b2cBatch === 'naver' ? 42300000 : b2cBatch === 'coupang_match' ? 76260000 : 75000000).toLocaleString()}) ↔ 정산 엑셀 실지급액 100% 일치` },
+      { 
+        '구분': '2단계: 주문별 상세 대사 결과', 
+        '항목/내용': b2cBatch !== 'coupang_mismatch'
+          ? '8건 주문 전액 일치 (정상 정산 완료)'
+          : disputeResolution === 'COLLECTED'
+          ? '총 8건 중 정상 7건(₩ 75,000,000) + 차월 회수 1건(₩ 1,260,000) ➔ 100% 전액 회수 종결'
+          : disputeResolution === 'WRITTEN_OFF'
+          ? '총 8건 중 정상 7건(₩ 75,000,000) / 대손 상각 1건(₩ 1,260,000) ➔ 손실 확정 장부 종결'
+          : disputeSuccessOrder !== null
+          ? '총 8건 중 정상 7건(₩ 75,000,000) / 기간대비 미정산 1건(₩ 1,260,000) ➔ 영업팀 이관 및 확인 중'
+          : '총 8건 중 정상 7건(₩ 75,000,000) / 기간대비 미정산 1건(₩ 1,260,000) 확인'
+      },
+      { 
+        '구분': '미정산건(CP-20261012-0205) 사후 처리 상태', 
+        '항목/내용': b2cBatch !== 'coupang_mismatch'
+          ? '해당 없음 (전건 정상 정산)'
+          : disputeResolution === 'COLLECTED'
+          ? '🟢 [회수 종결] 차월(11월) 쿠팡 정산 입금으로 확인되어 ₩ 1,260,000 전액 회수 종결 완료'
+          : disputeResolution === 'WRITTEN_OFF'
+          ? '⚪ [손실 확정] 영업팀 소명 불가 확인에 따른 대손 상각 처리 완료 (₩ 1,260,000 손실 확정 종결)'
+          : disputeSuccessOrder !== null
+          ? '⚠️ [조치 진행 중] 영업팀 이관 완료 (쿠팡 정산팀 사유 파악 및 차월 반영 대기)'
+          : '⚠️ 기간대비 미정산건 확인 (영업팀 이관 전 대기)'
+      },
+      { 
+        '구분': '최종 회계 원장 마감 상태', 
+        '항목/내용': b2cBatch !== 'coupang_mismatch'
+          ? '✅ 2026년 10월 정산 원장 전건 정상 마감 완료'
+          : disputeResolution === 'COLLECTED'
+          ? '✅ 2026년 10월 정산 원장 전건 회수 종결 (실정산액 ₩ 76,260,000 반영 완료)'
+          : disputeResolution === 'WRITTEN_OFF'
+          ? '✅ 2026년 10월 정산 원장 마감 (실입금 ₩ 75,000,000 + 대손손실 ₩ 1,260,000 확정)'
+          : '⏳ 2026년 10월 정산 대사 진행 중 (미정산 1건 영업팀 사후 조치 대기)'
+      },
       { '구분': '------------------------', '항목/내용': '------------------------------------------------------------' },
-      { '구분': '당사 기간 주문 총액', '항목/내용': 82000000 },
-      { '구분': '정산 실입금 총액', '항목/내용': 75000000 },
-      { '구분': '플랫폼 공제 총액', '항목/내용': 5740000 },
-      { '구분': '기간대비 미정산액 (영업팀 이관)', '항목/내용': 1260000 },
+      { '구분': '10월 주문 총액 (원금액)', '항목/내용': sumGross },
+      { '구분': '10월 정산 실입금액 (실금액)', '항목/내용': sumSettled },
+      { '구분': '플랫폼 공제 총액 (수수료+반품+파손)', '항목/내용': sumFee + sumReturn + sumDamage + sumEtc },
+      { 
+        '구분': '차월 회수 및 대손 처리액', 
+        '항목/내용': b2cBatch !== 'coupang_mismatch'
+          ? 0
+          : disputeResolution === 'COLLECTED'
+          ? '₩ 1,260,000 (차월 회수 입금 반영)'
+          : disputeResolution === 'WRITTEN_OFF'
+          ? '₩ 1,260,000 (대손 상각 손실 확정)'
+          : '₩ 1,260,000 (영업팀 이관 조사 중)'
+      },
       { '구분': 'B2B 대표자 매칭 결과', '항목/내용': '홍길동 명의 ₩ 15,000,000 (주)알파테크 미수금 상계 승인' },
-      { '구분': '회계 검증 공식', '항목/내용': '원금액(82,000,000) = 실입금(75,000,000) + 공제액(5,740,000) + 미정산(1,260,000)' }
+      { 
+        '구분': '회계 검증 공식', 
+        '항목/내용': disputeResolution === 'COLLECTED'
+          ? `원금액(${sumGross.toLocaleString()}) = 실입금(${sumSettled.toLocaleString()}) + 공제액(${(sumFee + sumReturn + sumDamage).toLocaleString()}) (100% 일치)`
+          : `원금액(${sumGross.toLocaleString()}) = 실입금(${sumSettled.toLocaleString()}) + 공제액(${(sumFee + sumReturn + sumDamage).toLocaleString()}) + 미정산/대손(1,260,000) (100% 일치)`
+      }
     ];
     const wsSummary = XLSX.utils.json_to_sheet(summaryData);
-    applySheetFormatting(wsSummary, [30, 75]);
+    applySheetFormatting(wsSummary, [32, 80]);
     XLSX.utils.book_append_sheet(wb, wsSummary, '1.정산대사_결과요약');
 
     // 2. 주문별 상세 대사 원장 시트
-    const activeOrders = b2cBatch === 'naver' ? NAVER_DEMO_ORDERS : b2cBatch === 'coupang_match' ? COUPANG_DEMO_ORDERS : COUPANG_MISMATCH_DEMO_ORDERS;
     const ordersData: any[] = activeOrders.map((ord, idx) => {
       const isDispute = ord.diffAmount !== 0;
       const settledAmt = isDispute && disputeResolution === 'COLLECTED' ? ord.grossAmount : ord.settledAmount;
       const statusStr = isDispute
         ? (disputeResolution === 'COLLECTED' ? '🟢 차월 정산 반영 (회수 완료)' : disputeResolution === 'WRITTEN_OFF' ? '⚪ 대손 상각 종결 (손실 확정)' : '⚠️ 기간대비 미정산건 확인 (영업팀 이관)')
         : (ord.damage > 0 ? '🔵 파손 차감 정산' : ord.returnLoss > 0 ? '🔴 반품/환불 차감 정산' : '🟢 전액 정산 완료');
+      
+      const resolutionAction = !isDispute
+        ? '정상 정산 입금 완료'
+        : disputeResolution === 'COLLECTED'
+        ? '🟢 [회수 종결] 차월 정산 실입금 반영 완료 (+₩ 1,260,000)'
+        : disputeResolution === 'WRITTEN_OFF'
+        ? '⚪ [손실 확정] 대손 상각 처리 완료 (회계상 손실 마감)'
+        : disputeSuccessOrder !== null
+        ? '⚠️ [진행 중] 영업팀 이관 완료 (차월 입금 또는 소명 대기)'
+        : '⚠️ 기간대비 미정산 (조치 대기)';
+
       const noteStr = isDispute
-        ? (disputeResolution === 'COLLECTED' ? '차월 정산 실입금 확인되어 전액 회수 종결' : disputeResolution === 'WRITTEN_OFF' ? '영업팀 확인에 따른 대손 상각 처리(손실 반영)' : '정산 엑셀 내역없음 (미수금 확정 및 영업팀 사유확인 전달)')
+        ? (disputeResolution === 'COLLECTED' ? '차월 쿠팡 정산 시 실입금 확인되어 전액 회수 종결됨' : disputeResolution === 'WRITTEN_OFF' ? '영업팀 확인에 따른 대손 상각 처리(손실 마감 완료)' : '정산 엑셀 내역없음 (미수금 확정 및 영업팀 사유확인 전달)')
         : '정상 정산 완료';
 
       return {
         'No': idx + 1,
+        '정산귀속월': reportMonth,
         '주문번호': ord.orderKey,
         '주문일자': ord.date,
         '상품명': ord.productName,
@@ -1305,23 +1375,18 @@ export default function App() {
         '파손손실차감': ord.damage,
         '기타공제': ord.etc,
         '실제정산금액(실금액)': settledAmt,
-        '정산상태': statusStr,
-        '비고 및 조치사항': noteStr
+        '대사상태': statusStr,
+        '최종 회계 처리 결과': resolutionAction,
+        '비고 및 상세 사유': noteStr
       };
     });
 
     // 하단 [합계] 행 추가
-    const sumGross = activeOrders.reduce((sum, o) => sum + o.grossAmount, 0);
-    const sumFee = activeOrders.reduce((sum, o) => sum + o.fee, 0);
-    const sumReturn = activeOrders.reduce((sum, o) => sum + o.returnLoss, 0);
-    const sumDamage = activeOrders.reduce((sum, o) => sum + o.damage, 0);
-    const sumEtc = activeOrders.reduce((sum, o) => sum + o.etc, 0);
-    const sumSettled = activeOrders.reduce((sum, o) => sum + (o.diffAmount !== 0 && disputeResolution === 'COLLECTED' ? o.grossAmount : o.settledAmount), 0);
-
     ordersData.push({
       'No': '합계',
+      '정산귀속월': reportMonth,
       '주문번호': `총 ${activeOrders.length}건`,
-      '주문일자': '-',
+      '주문일자': '2026-10-01 ~ 2026-10-31',
       '상품명': '-',
       '고객명': '-',
       '결제금액(원금액)': sumGross,
@@ -1330,17 +1395,29 @@ export default function App() {
       '파손손실차감': sumDamage,
       '기타공제': sumEtc,
       '실제정산금액(실금액)': sumSettled,
-      '정산상태': activeOrders.some(o => o.diffAmount !== 0) ? '7건 완료 / 1건 미정산' : '전건 정상 정산 완료',
-      '비고 및 조치사항': '원금액 = 실정산금액 + 공제액(수수료+반품+파손) + 미정산액 검증 일치'
+      '대사상태': disputeResolution === 'COLLECTED' 
+        ? '전건 회수/정산 종결 (8건)' 
+        : disputeResolution === 'WRITTEN_OFF' 
+        ? '7건 정산 완료 / 1건 대손 상각 종결' 
+        : (activeOrders.some(o => o.diffAmount !== 0) ? '7건 완료 / 1건 미정산' : '전건 정상 정산 완료'),
+      '최종 회계 처리 결과': disputeResolution === 'COLLECTED'
+        ? '차월 정산 반영으로 8건 전액 회수 종결'
+        : disputeResolution === 'WRITTEN_OFF'
+        ? '7건 정산 완료 / 1건 대손 상각 손실 확정'
+        : disputeSuccessOrder !== null
+        ? '영업팀 이관 및 확인 중'
+        : '전건 정상 정산 완료',
+      '비고 및 상세 사유': '원금액 = 실정산금액 + 공제액(수수료+반품+파손) + 미정산/대손액 검증 일치'
     });
 
     const wsOrders = XLSX.utils.json_to_sheet(ordersData);
-    applySheetFormatting(wsOrders, [8, 22, 13, 38, 10, 18, 14, 14, 14, 12, 20, 32, 45]);
+    applySheetFormatting(wsOrders, [6, 14, 22, 13, 36, 10, 18, 14, 14, 14, 12, 20, 26, 36, 45]);
     XLSX.utils.book_append_sheet(wb, wsOrders, '2.주문별_상세대사원장');
 
     // 3. 거래처별 미수금(AR) Aging 원장 시트
     const arData: any[] = partnersList.map((p, idx) => ({
       'No': idx + 1,
+      '정산귀속월': reportMonth,
       '거래처명': p.company_name,
       '사업자번호': p.business_number,
       '대표자명': p.ceo_name,
@@ -1355,6 +1432,7 @@ export default function App() {
     const sumUncollected = partnersList.reduce((sum, p) => sum + p.uncollected, 0);
     arData.push({
       'No': '합계',
+      '정산귀속월': reportMonth,
       '거래처명': `총 ${partnersList.length}개 거래처`,
       '사업자번호': '-',
       '대표자명': '-',
@@ -1366,12 +1444,13 @@ export default function App() {
     });
 
     const wsAR = XLSX.utils.json_to_sheet(arData);
-    applySheetFormatting(wsAR, [8, 22, 18, 12, 12, 20, 15, 30, 16]);
+    applySheetFormatting(wsAR, [6, 14, 22, 18, 12, 12, 20, 15, 30, 16]);
     XLSX.utils.book_append_sheet(wb, wsAR, '3.거래처_미수금Aging원장');
 
     // 4. 미확인 가수금 보관 원장 시트
     const suspenseData: any[] = suspenseList.map((s, idx) => ({
       'No': idx + 1,
+      '정산귀속월': reportMonth,
       '입금자명/적요': s.sender_name,
       '입금액(원)': s.amount,
       '발생원인': s.reason === 'DUPLICATE_CANDIDATES' ? '동명 대표자(김철수) 2건 중복 충돌' : '미등록 거래처 미확인 입금',
@@ -1383,6 +1462,7 @@ export default function App() {
     const sumSuspense = suspenseList.reduce((sum, s) => sum + s.amount, 0);
     suspenseData.push({
       'No': '합계',
+      '정산귀속월': reportMonth,
       '입금자명/적요': `총 ${suspenseList.length}건 보관`,
       '입금액(원)': sumSuspense,
       '발생원인': '동명 충돌 및 미등록 거래처 안전 격리',
@@ -1391,12 +1471,13 @@ export default function App() {
     });
 
     const wsSuspense = XLSX.utils.json_to_sheet(suspenseData);
-    applySheetFormatting(wsSuspense, [8, 22, 18, 35, 18, 12]);
+    applySheetFormatting(wsSuspense, [6, 14, 22, 18, 35, 18, 12]);
     XLSX.utils.book_append_sheet(wb, wsSuspense, '4.미확인가수금_보관원장');
 
     const nowStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    XLSX.writeFile(wb, `FinanceFlow_정산대사_통합보고서_${nowStr}.xlsx`);
-    setActionSuccessMsg('[엑셀 내보내기 완료] 4개 시트로 구성된 정산 대사 통합 결과 보고서(.xlsx)가 성공적으로 다운로드되었습니다.');
+    const platformFilePrefix = b2cBatch === 'naver' ? '네이버' : '쿠팡';
+    XLSX.writeFile(wb, `2026년_10월_정산대사_결과보고서_${platformFilePrefix}_${nowStr}.xlsx`);
+    setActionSuccessMsg(`[엑셀 다운로드 완료] 2026년 10월 ${platformName} 정산 대사 결과 보고서(.xlsx)가 저장되었습니다. (사후 회계 조치 내역 포함)`);
     setTimeout(() => setActionSuccessMsg(''), 5000);
   };
 
@@ -1706,7 +1787,7 @@ export default function App() {
               title="4개 시트 통합 정산 대사 결과 보고서(.xlsx) 다운로드"
             >
               <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">대사 보고서 (.xlsx)</span>
+              <span className="hidden sm:inline">10월 정산 보고서 (.xlsx)</span>
             </button>
 
             <button
@@ -3746,7 +3827,7 @@ export default function App() {
                                         className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-xs transition flex items-center gap-1.5 shrink-0 shadow-2xs"
                                       >
                                         <Download className="w-4 h-4 text-emerald-600" />
-                                        <span>대사 결과 리포트 내보내기 (.xlsx)</span>
+                                        <span>10월 정산 보고서 내보내기 (.xlsx)</span>
                                       </button>
                                     </>
                                   )}
