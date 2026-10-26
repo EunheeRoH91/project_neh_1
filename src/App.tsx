@@ -37,7 +37,8 @@ import {
   FileCheck,
   Play,
   Table,
-  Eye
+  Eye,
+  Clock
 } from 'lucide-react';
 import { 
   PieChart, 
