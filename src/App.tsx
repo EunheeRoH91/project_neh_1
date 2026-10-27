@@ -4061,9 +4061,6 @@ export default function App() {
                       </p>
                     </div>
                   </div>
-                  <span className="text-xs px-3 py-1.5 rounded-lg bg-white border border-slate-200 font-mono text-slate-600 font-semibold shadow-2xs">
-                    Table: public.suspense_amounts
-                  </span>
                 </div>
               </div>
 
