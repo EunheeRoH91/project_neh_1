@@ -665,6 +665,16 @@ export default function App() {
   // 6) 거래처 삭제 확인 모달 상태 (Phase 3)
   const [deletingPartner, setDeletingPartner] = useState<any | null>(null);
 
+  // 7) 미등록 가수금 수동 거래처 등록 모달 상태
+  const [registeringSuspense, setRegisteringSuspense] = useState<any | null>(null);
+  const [suspensePartnerForm, setSuspensePartnerForm] = useState({
+    company_name: '',
+    ceo_name: '',
+    business_number: '',
+    channel_type: 'B2B',
+    alias_active: true
+  });
+
   const [partnersList, setPartnersList] = useState<any[]>([
     { id: 'p-1', company_name: '(주)알파테크', business_number: '120-81-12345', ceo_name: '홍길동', channel_type: 'B2B', uncollected: 15000000, last_deal: '2026-10-05', alias_active: true },
     { id: 'p-2', company_name: '(주)베타로지스', business_number: '214-82-67890', ceo_name: '김철수', channel_type: 'B2B', uncollected: 5000000, last_deal: '2026-09-01', alias_active: true },
@@ -1084,6 +1094,68 @@ export default function App() {
       category: data.name,
       records: relatedRisks
     });
+  };
+
+  // 5.1-2 미등록 가수금 건에 대해 거래처 수동 등록 모달 열기
+  const handleOpenRegisterSuspensePartner = (item: any) => {
+    setRegisteringSuspense(item);
+    setSuspensePartnerForm({
+      company_name: item.sender_name || '',
+      ceo_name: item.sender_name || '',
+      business_number: '',
+      channel_type: channelsList[0]?.code || 'B2B',
+      alias_active: true
+    });
+  };
+
+  // 5.1-3 미등록 가수금 건 거래처 마스터 등록 및 가수금 즉시 연동
+  const handleSaveSuspensePartner = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!registeringSuspense) return;
+    if (!suspensePartnerForm.company_name.trim() || !suspensePartnerForm.ceo_name.trim()) {
+      alert('상호명과 대표자명(식별 키)은 필수 입력 항목입니다.');
+      return;
+    }
+
+    const createdPartner = {
+      id: `p-${Date.now()}`,
+      company_name: suspensePartnerForm.company_name.trim(),
+      ceo_name: suspensePartnerForm.ceo_name.trim(),
+      business_number: suspensePartnerForm.business_number.trim() || '120-88-00001',
+      channel_type: suspensePartnerForm.channel_type || 'B2B',
+      uncollected: 0,
+      last_deal: new Date().toISOString().slice(0, 10),
+      alias_active: suspensePartnerForm.alias_active
+    };
+
+    // 1. 거래처 목록(partnersList)에 추가
+    setPartnersList(prev => [createdPartner, ...prev]);
+
+    // 2. 가수금 목록(suspenseList)에서 해당 건 연동 종결 처리
+    setSuspenseList(prev => prev.filter(s => s.id !== registeringSuspense.id));
+
+    // 3. 감사 로그 기록
+    const newAudit = {
+      id: `a-${Date.now()}`,
+      action_type: 'SUSPENSE_MANUAL_PARTNER_LINK',
+      target_id: createdPartner.company_name,
+      actor_email: currentRole === 'admin' ? 'admin@finance.corp' : 'user@finance.corp',
+      actor_role: currentRole,
+      memo: `[가수금 수동 등록] 입금 적요 '${registeringSuspense.sender_name}'(₩${Number(registeringSuspense.amount).toLocaleString()}) ➔ 신규 거래처 [${createdPartner.company_name}] 마스터 등록 및 연동 완료`,
+      amount: Number(registeringSuspense.amount || 0),
+      created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    };
+    setAuditLogs(prev => [newAudit, ...prev]);
+
+    // 4. 모달 닫기
+    setRegisteringSuspense(null);
+
+    // 5. 성공 메시지 및 거래처 관리 탭으로 화면 전환
+    setActionSuccessMsg(`[거래처 수동 등록 완료] '${createdPartner.company_name}'이(가) 거래처 관리 탭에 신규 연동 등록되었습니다.`);
+    setTimeout(() => setActionSuccessMsg(''), 4500);
+
+    // 거래처 관리 탭으로 즉시 화면 전환하여 연동 결과 시각적 확인
+    setActiveTab('partners');
   };
 
   // 5.2 동명/동일 금액 중복 충돌 수동 분개 확정 (Admin)
@@ -4855,25 +4927,35 @@ export default function App() {
                                     {item.status}
                                   </span>
                                 </td>
-                                <td className="px-6 py-4 text-center">
+                                <td className="px-6 py-4 text-center whitespace-nowrap">
                                   {isConflict && currentRole === 'admin' ? (
                                     <button
                                       onClick={() => setConflictModalItem(item)}
-                                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs hover:shadow-md transition active:scale-[0.98]"
+                                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-xs hover:shadow-md transition active:scale-[0.98] whitespace-nowrap"
+                                      title="동명 대표자 거래처 육안 검토 후 매칭"
                                     >
-                                      ⚠️ 동일 명의 거래처 {item.conflict_count}건 존재 [조회 및 수동 연결]
+                                      <Split className="w-3.5 h-3.5" />
+                                      <span>거래처 매칭</span>
                                     </button>
                                   ) : isUnmatched && currentRole === 'admin' ? (
                                     <button
                                       onClick={() => handleResolveDiffItem(item)}
-                                      className="px-3.5 py-1.5 rounded-xl bg-[#1E40AF] hover:bg-blue-800 text-white font-bold text-xs shadow-2xs transition"
+                                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#1E40AF] hover:bg-blue-800 text-white font-bold text-xs shadow-2xs transition whitespace-nowrap"
                                     >
-                                      차액 정산 승인
+                                      <span>차액 정산 승인</span>
                                     </button>
                                   ) : isConflict && currentRole === 'executive' ? (
-                                    <span className="text-xs text-slate-400 italic">경영진 조회 전용</span>
+                                    <span className="text-xs text-slate-400 italic whitespace-nowrap">경영진 조회 전용</span>
                                   ) : (
-                                    <span className="text-xs text-slate-400">검토 대기</span>
+                                    <button
+                                      disabled={currentRole === 'viewer'}
+                                      onClick={() => handleOpenRegisterSuspensePartner(item)}
+                                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#1E40AF] hover:bg-blue-800 disabled:opacity-40 text-white font-bold text-xs shadow-xs hover:shadow-md transition active:scale-[0.98] whitespace-nowrap"
+                                      title="신규 거래처로 등록하고 가수금 연동"
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                      <span>수동 등록</span>
+                                    </button>
                                   )}
                                 </td>
                               </tr>
@@ -5936,6 +6018,137 @@ export default function App() {
           </div>
         );
       })()}
+
+      {/* ============================================================== */}
+      {/* 8-7. 미등록 가수금 건 거래처 수동 등록 & 즉시 연동 모달         */}
+      {/* ============================================================== */}
+      {registeringSuspense && (
+        <div className="fixed inset-0 bg-[#0F172A]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-[#1E40AF]">
+                  <Building2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#0F172A]">미등록 입금 건 거래처 수동 등록</h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    통장 적요: <strong className="text-slate-700 font-mono">{registeringSuspense.sender_name}</strong> | 입금액: <strong className="text-[#1E40AF] font-mono">₩ {Number(registeringSuspense.amount || 0).toLocaleString()}</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setRegisteringSuspense(null)}
+                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSuspensePartner} className="mt-4 space-y-3.5">
+              <div className="p-3 bg-blue-50/70 border border-blue-200/80 rounded-xl text-xs text-blue-900 leading-relaxed">
+                💡 정보를 입력하고 저장하면 <strong>[거래처 & 채널]</strong> 탭에 신규 거래처로 자동 등록되고, 해당 가수금(₩ {Number(registeringSuspense.amount || 0).toLocaleString()})은 정상 입금 매칭 완료 처리됩니다.
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  법인 / 거래처 상호명 *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="예: (주)모름파트너스"
+                  value={suspensePartnerForm.company_name}
+                  onChange={(e) => setSuspensePartnerForm(prev => ({ ...prev, company_name: e.target.value }))}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    소속 채널 (Channel Type) *
+                  </label>
+                  <select
+                    value={suspensePartnerForm.channel_type}
+                    onChange={(e) => setSuspensePartnerForm(prev => ({ ...prev, channel_type: e.target.value }))}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium cursor-pointer"
+                  >
+                    {channelsList.map(ch => (
+                      <option key={ch.id} value={ch.code}>
+                        {ch.name} ({ch.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    대표자명 / 적요 매칭 키 *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="통장 적요 식별자"
+                    value={suspensePartnerForm.ceo_name}
+                    onChange={(e) => setSuspensePartnerForm(prev => ({ ...prev, ceo_name: e.target.value }))}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  사업자등록번호
+                </label>
+                <input
+                  type="text"
+                  placeholder="예: 120-88-00001"
+                  value={suspensePartnerForm.business_number}
+                  onChange={(e) => setSuspensePartnerForm(prev => ({ ...prev, business_number: e.target.value }))}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-mono"
+                />
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">
+                    통장 적요 교차 대조 활성화
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    향후 동일 적요 입금 시 이 거래처로 자동 매칭합니다.
+                  </span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={suspensePartnerForm.alias_active}
+                    onChange={(e) => setSuspensePartnerForm(prev => ({ ...prev, alias_active: e.target.checked }))}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#1E40AF]"></div>
+                </label>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setRegisteringSuspense(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-[#1E40AF] hover:bg-blue-800 text-white text-xs font-bold rounded-xl transition shadow-xs active:scale-95"
+                >
+                  거래처 등록 및 가수금 연동
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ============================================================== */}
       {/* 9-1. 대시보드 매출 원장 주문 상세 수정 모달 (차감 내역 포함)          */}
