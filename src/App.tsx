@@ -1643,7 +1643,7 @@ export default function App() {
       const isDispute = ord.diffAmount !== 0;
       const settledAmt = isDispute && disputeResolution === 'COLLECTED' ? ord.grossAmount : ord.settledAmount;
       const statusStr = isDispute
-        ? (disputeResolution === 'COLLECTED' ? '🟢 차월 정산 반영 (회수 완료)' : disputeResolution === 'WRITTEN_OFF' ? '⚪ 대손 상각 종결 (손실 확정)' : '⚠️ 기간대비 미정산건 확인 (영업팀 이관)')
+        ? (disputeResolution === 'COLLECTED' ? '🟢 차월 정산 반영 (회수 완료)' : disputeResolution === 'WRITTEN_OFF' ? '⚪ 대손 상각 종결 (손실 확정)' : '⚠️ 기간대비 미정산건 확인')
         : (ord.damage > 0 ? '🔵 파손 차감 정산' : ord.returnLoss > 0 ? '🔴 반품/환불 차감 정산' : '🟢 전액 정산 완료');
       
       const resolutionAction = !isDispute
@@ -3727,7 +3727,7 @@ export default function App() {
                                         {totalDiff !== 0 ? `- ₩ ${Math.abs(totalDiff).toLocaleString()}` : '₩ 0'}
                                       </div>
                                       <p className="text-[10px] text-slate-400 mt-0.5">
-                                        {totalDiff !== 0 ? '기간대비 미정산건 확인 (영업팀 이관)' : '오차 없음 (전건 정산됨)'}
+                                        {totalDiff !== 0 ? '기간대비 미정산건 확인' : '오차 없음 (전건 정산됨)'}
                                       </p>
                                     </div>
                                   </div>
@@ -3909,7 +3909,7 @@ export default function App() {
                                                   <span 
                                                     className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap"
                                                   >
-                                                    ⚠️ 기간대비 미정산건 확인 (영업팀 이관)
+                                                    ⚠️ 기간대비 미정산건 확인
                                                   </span>
                                                 )
                                               ) : ord.damage > 0 ? (
@@ -4066,7 +4066,7 @@ export default function App() {
                                               target_id: 'CP-20261012-0205',
                                               actor_email: 'finance@manager.corp',
                                               actor_role: currentRole,
-                                              memo: '주문 CP-20261012-0205 기간대비 미정산건 확인 (영업팀 이관)',
+                                              memo: '주문 CP-20261012-0205 기간대비 미정산건 확인',
                                               amount: 1260000,
                                               created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
                                             };
