@@ -38,7 +38,8 @@ import {
   Play,
   Table,
   Eye,
-  Clock
+  Clock,
+  Edit2
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -487,6 +488,37 @@ export default function App() {
   const [disputeSuccessOrder, setDisputeSuccessOrder] = useState<string | null>(null);
   const [disputeResolution, setDisputeResolution] = useState<'COLLECTED' | 'WRITTEN_OFF' | null>(null);
   const [partialApproved, setPartialApproved] = useState<boolean>(false);
+
+  // B2C 주문 리스트 상태 (상세 수정 시 실시간 반영)
+  const [naverOrders, setNaverOrders] = useState<DemoSettlementOrder[]>(NAVER_DEMO_ORDERS);
+  const [coupangMatchOrders, setCoupangMatchOrders] = useState<DemoSettlementOrder[]>(COUPANG_DEMO_ORDERS);
+  const [coupangMismatchOrders, setCoupangMismatchOrders] = useState<DemoSettlementOrder[]>(COUPANG_MISMATCH_DEMO_ORDERS);
+
+  // 주문 상세 수정 모달 상태 (Phase 1)
+  const [editingOrder, setEditingOrder] = useState<DemoSettlementOrder | null>(null);
+  const [editOrderForm, setEditOrderForm] = useState<{
+    orderKey: string;
+    date: string;
+    productName: string;
+    customer: string;
+    grossAmount: number;
+    fee: number;
+    returnLoss: number;
+    damage: number;
+    etc: number;
+    reason: string;
+  }>({
+    orderKey: '',
+    date: '',
+    productName: '',
+    customer: '',
+    grossAmount: 0,
+    fee: 0,
+    returnLoss: 0,
+    damage: 0,
+    etc: 0,
+    reason: ''
+  });
 
   // 4.1 실제 엑셀/CSV 드래그 앤 드롭 업로드 및 파싱 상태
   const [uploadedBankFile, setUploadedBankFile] = useState<{
@@ -1274,6 +1306,98 @@ export default function App() {
   };
 
   // 4.3 정산 대사 통합 결과 엑셀 다운로드 (보고서 내보내기 & 엑셀 스타일/틀 정돈)
+  // 주문 상세 수정 모달 열기 (Phase 1)
+  const handleOpenEditOrderModal = (ord: DemoSettlementOrder) => {
+    setEditingOrder(ord);
+    setEditOrderForm({
+      orderKey: ord.orderKey,
+      date: ord.date,
+      productName: ord.productName,
+      customer: ord.customer,
+      grossAmount: ord.grossAmount,
+      fee: ord.fee,
+      returnLoss: ord.returnLoss,
+      damage: ord.damage,
+      etc: ord.etc || 0,
+      reason: ''
+    });
+  };
+
+  // 주문 상세 수정 저장 및 자동 회계 재계산 (Phase 1)
+  const handleSaveEditOrder = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingOrder) return;
+
+    const gross = Math.max(0, Number(editOrderForm.grossAmount) || 0);
+    const fee = Math.max(0, Number(editOrderForm.fee) || 0);
+    const returnLoss = Math.max(0, Number(editOrderForm.returnLoss) || 0);
+    const damage = Math.max(0, Number(editOrderForm.damage) || 0);
+    const etc = Math.max(0, Number(editOrderForm.etc) || 0);
+
+    const totalDeductions = fee + returnLoss + damage + etc;
+    if (totalDeductions > gross) {
+      alert('공제액 합계가 결제 원금액을 초과할 수 없습니다. (음수 정산 방지)');
+      return;
+    }
+
+    const calculatedSettled = gross - totalDeductions;
+
+    const updatedOrder: DemoSettlementOrder = {
+      ...editingOrder,
+      date: editOrderForm.date,
+      productName: editOrderForm.productName,
+      customer: editOrderForm.customer,
+      grossAmount: gross,
+      fee,
+      returnLoss,
+      damage,
+      etc,
+      settledAmount: calculatedSettled,
+      expectedSettledAmount: calculatedSettled,
+      diffAmount: 0
+    };
+
+    if (b2cBatch === 'naver') {
+      setNaverOrders(prev => prev.map(o => o.orderKey === editingOrder.orderKey ? updatedOrder : o));
+    } else if (b2cBatch === 'coupang_match') {
+      setCoupangMatchOrders(prev => prev.map(o => o.orderKey === editingOrder.orderKey ? updatedOrder : o));
+    } else {
+      setCoupangMismatchOrders(prev => prev.map(o => o.orderKey === editingOrder.orderKey ? updatedOrder : o));
+    }
+
+    // 매출 원장(salesRecords) 동기화
+    setSalesRecords(prev => prev.map(s => {
+      if (s.order_key === editingOrder.orderKey) {
+        return {
+          ...s,
+          sales_date: editOrderForm.date,
+          product_name: editOrderForm.productName,
+          buyer_name: editOrderForm.customer,
+          gross_amount: gross
+        };
+      }
+      return s;
+    }));
+
+    // 감사 로그(Audit Trail) 기록
+    const newAudit = {
+      id: `a-${Date.now()}`,
+      action_type: 'ORDER_DETAIL_EDITED',
+      target_id: editingOrder.orderKey,
+      actor_email: currentRole === 'admin' ? 'admin@finance.corp' : 'finance@manager.corp',
+      actor_role: currentRole,
+      memo: `주문(${editingOrder.orderKey}) 상세 수정: 결제액 ₩ ${gross.toLocaleString()} / 공제 ₩ ${totalDeductions.toLocaleString()} ➔ 실정산 ₩ ${calculatedSettled.toLocaleString()}${editOrderForm.reason ? ` (사유: ${editOrderForm.reason})` : ''}`,
+      amount: calculatedSettled,
+      created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    };
+    setAuditLogs(prev => [newAudit, ...prev]);
+
+    setActionSuccessMsg(`[주문 수정 완료] 주문번호 ${editingOrder.orderKey}의 상세 정보 및 공제액이 정상 재계산되어 원장에 반영되었습니다.`);
+    setTimeout(() => setActionSuccessMsg(''), 4500);
+
+    setEditingOrder(null);
+  };
+
   const handleExportReconciliationExcel = () => {
     const wb = XLSX.utils.book_new();
 
@@ -1292,7 +1416,7 @@ export default function App() {
       }
     };
 
-    const activeOrders = b2cBatch === 'naver' ? NAVER_DEMO_ORDERS : b2cBatch === 'coupang_match' ? COUPANG_DEMO_ORDERS : COUPANG_MISMATCH_DEMO_ORDERS;
+    const activeOrders = b2cBatch === 'naver' ? naverOrders : b2cBatch === 'coupang_match' ? coupangMatchOrders : coupangMismatchOrders;
     const platformName = b2cBatch === 'naver' ? '네이버 스마트스토어' : '쿠팡 로켓배송';
     const reportMonth = '2026년 10월';
 
@@ -3261,10 +3385,10 @@ export default function App() {
                         {b2cStep === 2 && (() => {
                           const batchPlatformName = b2cBatch === 'naver' ? '네이버 스마트스토어' : '쿠팡 로켓배송';
                           const activeOrders = b2cBatch === 'naver' 
-                            ? NAVER_DEMO_ORDERS 
+                            ? naverOrders 
                             : b2cBatch === 'coupang_match' 
-                              ? COUPANG_DEMO_ORDERS 
-                              : COUPANG_MISMATCH_DEMO_ORDERS;
+                              ? coupangMatchOrders 
+                              : coupangMismatchOrders;
                           const hasMissingOrder = activeOrders.some(ord => ord.diffAmount !== 0);
 
                           const totalGross = activeOrders.reduce((acc, cur) => acc + cur.grossAmount, 0);
@@ -3508,13 +3632,14 @@ export default function App() {
                                   <table className="w-full text-left text-xs table-fixed">
                                     <colgroup>
                                       <col className="w-10" />
-                                      <col className="w-36" />
+                                      <col className="w-32" />
+                                      <col className="w-44" />
+                                      <col className="w-24" />
+                                      <col className="w-24" />
+                                      <col className="w-24" />
+                                      <col className="w-24" />
                                       <col className="w-48" />
-                                      <col className="w-28" />
-                                      <col className="w-28" />
-                                      <col className="w-28" />
-                                      <col className="w-28" />
-                                      <col className="w-52" />
+                                      <col className="w-20" />
                                     </colgroup>
                                     <thead className="bg-[#F8FAFC] text-slate-500 font-bold border-b border-slate-200 sticky top-0 text-[11px]">
                                       <tr>
@@ -3538,6 +3663,7 @@ export default function App() {
                                         <th className="px-3 py-2.5 text-right whitespace-nowrap">환불/반품 차감</th>
                                         <th className="px-3 py-2.5 text-right whitespace-nowrap">실제 정산금액 (실금액)</th>
                                         <th className="px-4 py-2.5 text-center whitespace-nowrap">정산 상태 & 사유</th>
+                                        <th className="px-3 py-2.5 text-center whitespace-nowrap">관리</th>
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -3633,6 +3759,17 @@ export default function App() {
                                                 </span>
                                               )}
                                             </td>
+                                            <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                                              <button
+                                                onClick={() => handleOpenEditOrderModal(ord)}
+                                                disabled={currentRole === 'viewer'}
+                                                className="px-2.5 py-1 rounded-lg border border-slate-200 hover:border-[#1E40AF] text-slate-600 hover:text-[#1E40AF] hover:bg-blue-50/60 transition inline-flex items-center gap-1 text-[11px] font-semibold disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+                                                title="주문 금액 및 공제 항목 수정"
+                                              >
+                                                <Edit2 className="w-3 h-3 text-[#1E40AF]" />
+                                                <span>수정</span>
+                                              </button>
+                                            </td>
                                           </tr>
                                         );
                                       })}
@@ -3664,6 +3801,7 @@ export default function App() {
                                             ? '7건 정산 완료 / 1건 미정산'
                                             : '전건 정상 정산 완료'}
                                         </td>
+                                        <td className="px-3 py-2.5 text-center text-slate-400 whitespace-nowrap font-normal">-</td>
                                       </tr>
                                     </tfoot>
                                   </table>
@@ -3721,7 +3859,7 @@ export default function App() {
                                         disabled={partialApproved || currentRole === 'viewer'}
                                         onClick={() => {
                                           setPartialApproved(true);
-                                          const normalKeys = COUPANG_MISMATCH_DEMO_ORDERS.filter(o => !o.diffAmount || o.diffAmount === 0).map(o => o.orderKey);
+                                          const normalKeys = coupangMismatchOrders.filter(o => !o.diffAmount || o.diffAmount === 0).map(o => o.orderKey);
                                           setSalesRecords(prev => prev.map(s => normalKeys.includes(s.order_key) ? { ...s, status: 'PAID' } : s));
                                           
                                           const newAudit = {
@@ -4727,6 +4865,228 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* ============================================================== */}
+      {/* 9. 모달: 주문 상세 및 정산 공제액 수정 모달 (Phase 1)             */}
+      {/* ============================================================== */}
+      {editingOrder && (
+        <div className="fixed inset-0 bg-[#0F172A]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-[#1E40AF]">
+                  <Edit2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-[#0F172A] flex items-center gap-2">
+                    주문 상세 및 정산 공제액 수정
+                    <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-blue-50 text-[#1E40AF] border border-blue-200">
+                      {editingOrder.orderKey}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    결제 원금액과 플랫폼 공제 항목을 수정하면 실정산금액이 회계 공식에 따라 자동 재계산됩니다.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingOrder(null)}
+                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditOrder} className="mt-5 space-y-4">
+              {/* 기본 주문 정보 행 */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">
+                    주문일자
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editOrderForm.date}
+                    onChange={(e) => setEditOrderForm(prev => ({ ...prev, date: e.target.value }))}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">
+                    고객명 (주문자)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editOrderForm.customer}
+                    onChange={(e) => setEditOrderForm(prev => ({ ...prev, customer: e.target.value }))}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">
+                    상품명
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editOrderForm.productName}
+                    onChange={(e) => setEditOrderForm(prev => ({ ...prev, productName: e.target.value }))}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20"
+                  />
+                </div>
+              </div>
+
+              {/* 금액 및 공제 항목 입력 그리드 */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Receipt className="w-3.5 h-3.5 text-[#1E40AF]" />
+                    금액 및 공제 상세 설정 (원 단위)
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-mono">
+                    원금액 = 실정산액 + 수수료 + 반품 + 파손
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      결제금액 (원금액, Gross Amount) *
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-xs">₩</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        required
+                        value={editOrderForm.grossAmount}
+                        onChange={(e) => setEditOrderForm(prev => ({ ...prev, grossAmount: Number(e.target.value) }))}
+                        className="w-full text-xs pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-white font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      플랫폼 수수료 차감액 (Fee)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-xs">- ₩</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="100"
+                        value={editOrderForm.fee}
+                        onChange={(e) => setEditOrderForm(prev => ({ ...prev, fee: Number(e.target.value) }))}
+                        className="w-full text-xs pl-10 pr-3 py-2 rounded-xl border border-slate-200 bg-white font-mono focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      환불 / 반품 차감액 (Return Loss)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-rose-500 font-mono text-xs">- ₩</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="100"
+                        value={editOrderForm.returnLoss}
+                        onChange={(e) => setEditOrderForm(prev => ({ ...prev, returnLoss: Number(e.target.value) }))}
+                        className="w-full text-xs pl-10 pr-3 py-2 rounded-xl border border-slate-200 bg-white font-mono text-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      파손 / 손실 차감액 (Damage Loss)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sky-500 font-mono text-xs">- ₩</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="100"
+                        value={editOrderForm.damage}
+                        onChange={(e) => setEditOrderForm(prev => ({ ...prev, damage: Number(e.target.value) }))}
+                        className="w-full text-xs pl-10 pr-3 py-2 rounded-xl border border-slate-200 bg-white font-mono text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 실시간 회계 자동 재계산 배너 */}
+                {(() => {
+                  const gross = Number(editOrderForm.grossAmount) || 0;
+                  const totalDeductions = (Number(editOrderForm.fee) || 0) + (Number(editOrderForm.returnLoss) || 0) + (Number(editOrderForm.damage) || 0) + (Number(editOrderForm.etc) || 0);
+                  const settled = gross - totalDeductions;
+                  const isOver = totalDeductions > gross;
+
+                  return (
+                    <div className={`p-3 rounded-xl border text-xs ${
+                      isOver 
+                        ? 'bg-rose-50 border-rose-300 text-rose-800'
+                        : 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+                    }`}>
+                      <div className="flex items-center justify-between font-bold">
+                        <span>회계 자동 재계산 결과:</span>
+                        <span className="font-mono text-sm">
+                          실제 정산금액: ₩ {settled.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-[11px] opacity-80 font-mono">
+                        <span>결제액 ₩ {gross.toLocaleString()} - 공제계 ₩ {totalDeductions.toLocaleString()}</span>
+                        <span>{isOver ? '⚠️ 공제액 초과 (저장 불가)' : '✅ 회계 공식 일치'}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* 수정 사유 입력 */}
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
+                  수정 사유 및 관리자 메모 (감사 추적용)
+                </label>
+                <input
+                  type="text"
+                  placeholder="예: 쿠팡 수수료 사후 정정, 고객 추가 반품 반영 등"
+                  value={editOrderForm.reason}
+                  onChange={(e) => setEditOrderForm(prev => ({ ...prev, reason: e.target.value }))}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingOrder(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  disabled={
+                    (Number(editOrderForm.fee) || 0) + (Number(editOrderForm.returnLoss) || 0) + (Number(editOrderForm.damage) || 0) + (Number(editOrderForm.etc) || 0) > (Number(editOrderForm.grossAmount) || 0) ||
+                    (Number(editOrderForm.grossAmount) || 0) <= 0
+                  }
+                  className="px-5 py-2 bg-[#1E40AF] hover:bg-blue-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 active:scale-95"
+                >
+                  <CheckCheck className="w-4 h-4" />
+                  <span>회계 재계산 및 수정 저장</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ============================================================== */}
       {/* 8. 모달 3: 업로드 파일 파싱 데이터 미리보기 모달                 */}
       {/* ============================================================== */}
