@@ -605,6 +605,17 @@ export default function App() {
   const [showNewPartnerModal, setShowNewPartnerModal] = useState<boolean>(false);
   const [newPartnerForm, setNewPartnerForm] = useState({ company_name: '', ceo_name: '', business_number: '', channel_type: 'B2B' });
 
+  // Phase 2: 거래처 & 판매 채널 정보 수정 모달 상태
+  const [editingPartner, setEditingPartner] = useState<any | null>(null);
+  const [editPartnerForm, setEditPartnerForm] = useState({
+    company_name: '',
+    ceo_name: '',
+    business_number: '',
+    channel_type: 'B2B',
+    uncollected: 0,
+    alias_active: true
+  });
+
   const [partnersList, setPartnersList] = useState<any[]>([
     { id: 'p-1', company_name: '(주)알파테크', business_number: '120-81-12345', ceo_name: '홍길동', channel_type: 'B2B', uncollected: 15000000, last_deal: '2026-10-05', alias_active: true },
     { id: 'p-2', company_name: '(주)베타로지스', business_number: '214-82-67890', ceo_name: '김철수', channel_type: 'B2B', uncollected: 5000000, last_deal: '2026-09-01', alias_active: true },
@@ -1087,6 +1098,97 @@ export default function App() {
 
     setActionSuccessMsg(`[거래처 마스터 등록] [${newPartner.channel_type}] ${newPartner.company_name} (대표자: ${newPartner.ceo_name})가 등록되어 적요 교차 매칭에 즉시 반영됩니다.`);
     setTimeout(() => setActionSuccessMsg(''), 4500);
+  };
+
+  // Phase 2: 거래처 및 판매 채널 정보 수정 모달 열기
+  const handleOpenEditPartner = (p: any) => {
+    setEditingPartner(p);
+    setEditPartnerForm({
+      company_name: p.company_name,
+      ceo_name: p.ceo_name,
+      business_number: p.business_number || '',
+      channel_type: p.channel_type || 'B2B',
+      uncollected: p.uncollected || 0,
+      alias_active: p.alias_active ?? true
+    });
+  };
+
+  // Phase 2: 거래처 및 판매 채널 정보 수정 저장
+  const handleSaveEditPartner = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPartner) return;
+    if (!editPartnerForm.company_name.trim() || !editPartnerForm.ceo_name.trim()) {
+      alert('상호명과 대표자명(식별자)은 필수 입력 항목입니다.');
+      return;
+    }
+
+    const oldName = editingPartner.company_name;
+    const oldType = editingPartner.channel_type;
+    const newName = editPartnerForm.company_name.trim();
+    const newType = editPartnerForm.channel_type;
+    const newCeo = editPartnerForm.ceo_name.trim();
+    const newBizNo = editPartnerForm.business_number.trim();
+    const newUncollected = Number(editPartnerForm.uncollected || 0);
+    const newAliasActive = editPartnerForm.alias_active;
+
+    // 1. partnersList 갱신
+    setPartnersList(prev => prev.map(p => {
+      if (p.id === editingPartner.id) {
+        return {
+          ...p,
+          company_name: newName,
+          channel_type: newType,
+          ceo_name: newCeo,
+          business_number: newBizNo,
+          uncollected: newUncollected,
+          alias_active: newAliasActive
+        };
+      }
+      return p;
+    }));
+
+    // 2. salesRecords 내의 관련 거래처 주문 정보 동기화
+    setSalesRecords(prev => prev.map(s => {
+      if (s.business_partners?.company_name === oldName) {
+        return {
+          ...s,
+          business_partners: {
+            ...s.business_partners,
+            company_name: newName,
+            channel_type: newType,
+            ceo_name: newCeo
+          }
+        };
+      }
+      return s;
+    }));
+
+    // 3. 감사 로그 기록
+    const changes: string[] = [];
+    if (oldName !== newName) changes.push(`상호: [${oldName}] ➔ [${newName}]`);
+    if (oldType !== newType) changes.push(`채널: [${oldType}] ➔ [${newType}]`);
+    if (editingPartner.ceo_name !== newCeo) changes.push(`대표자: [${editingPartner.ceo_name}] ➔ [${newCeo}]`);
+    if (editingPartner.business_number !== newBizNo) changes.push(`사업자번호: [${editingPartner.business_number}] ➔ [${newBizNo}]`);
+    if (Number(editingPartner.uncollected || 0) !== newUncollected) changes.push(`미수금: [₩${Number(editingPartner.uncollected || 0).toLocaleString()}] ➔ [₩${newUncollected.toLocaleString()}]`);
+
+    const newAudit = {
+      id: `a-${Date.now()}`,
+      action_type: 'PARTNER_INFO_UPDATED',
+      target_id: newName,
+      actor_email: currentRole === 'admin' ? 'admin@finance.corp' : 'user@finance.corp',
+      actor_role: currentRole,
+      memo: `거래처/판매채널 마스터 정보 수정 완료 (${changes.join(', ') || '정보 갱신'})`,
+      amount: newUncollected,
+      created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    };
+    setAuditLogs(prev => [newAudit, ...prev]);
+
+    // 4. 성공 알림 토스트
+    setActionSuccessMsg(`[거래처/채널 정보 수정 완료] '${newName}' (채널: ${newType}) 정보가 성공적으로 반영되었습니다.`);
+    setTimeout(() => setActionSuccessMsg(''), 4500);
+
+    // 5. 모달 닫기
+    setEditingPartner(null);
   };
 
   // 차액 불일치 건 승인/처리
@@ -2463,6 +2565,10 @@ export default function App() {
                               return <span className="px-2 py-0.5 rounded-md bg-orange-50 text-orange-700 font-bold text-[10px] border border-orange-200 whitespace-nowrap">쿠팡 로켓</span>;
                             case 'OWN_MALL':
                               return <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 font-bold text-[10px] border border-purple-200 whitespace-nowrap">자사몰 PG</span>;
+                            case 'OPEN_MARKET':
+                              return <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-bold text-[10px] border border-amber-200 whitespace-nowrap">오픈마켓</span>;
+                            case 'OFFLINE':
+                              return <span className="px-2 py-0.5 rounded-md bg-teal-50 text-teal-700 font-bold text-[10px] border border-teal-200 whitespace-nowrap">오프라인 매장</span>;
                             default:
                               return <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold text-[10px] whitespace-nowrap">{ch}</span>;
                           }
@@ -4654,6 +4760,7 @@ export default function App() {
                         <th className="px-5 py-3.5">사업자등록번호</th>
                         <th className="px-5 py-3.5 text-right">미수금 / 정산 잔액</th>
                         <th className="px-5 py-3.5 text-center">정산 대조 상태</th>
+                        <th className="px-5 py-3.5 text-center">관리</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -4680,6 +4787,10 @@ export default function App() {
                                 return <span className="px-2.5 py-1 rounded-md bg-orange-50 text-orange-700 font-bold text-[11px] border border-orange-200">쿠팡 로켓</span>;
                               case 'OWN_MALL':
                                 return <span className="px-2.5 py-1 rounded-md bg-purple-50 text-purple-700 font-bold text-[11px] border border-purple-200">자사몰 PG</span>;
+                              case 'OPEN_MARKET':
+                                return <span className="px-2.5 py-1 rounded-md bg-amber-50 text-amber-700 font-bold text-[11px] border border-amber-200">오픈마켓</span>;
+                              case 'OFFLINE':
+                                return <span className="px-2.5 py-1 rounded-md bg-teal-50 text-teal-700 font-bold text-[11px] border border-teal-200">오프라인 매장</span>;
                               default:
                                 return <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 font-semibold text-[11px]">{ch}</span>;
                             }
@@ -4711,6 +4822,17 @@ export default function App() {
                                 ) : (
                                   <span className="text-slate-400 text-[11px]">2-Step 덩어리 대조</span>
                                 )}
+                              </td>
+                              <td className="px-5 py-4 text-center">
+                                <button
+                                  disabled={currentRole === 'viewer'}
+                                  onClick={() => handleOpenEditPartner(p)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-blue-50 text-slate-700 hover:text-[#1E40AF] border border-slate-200 hover:border-blue-300 transition shadow-xs active:scale-95 disabled:opacity-40"
+                                  title="거래처 및 판매 채널 정보 수정"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5 text-[#1E40AF]" />
+                                  <span>수정</span>
+                                </button>
                               </td>
                             </tr>
                           );
@@ -5032,6 +5154,156 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* ============================================================== */}
+      {/* 8-2. 거래처 & 판매 채널 정보 수정 모달 (Phase 2)                */}
+      {/* ============================================================== */}
+      {editingPartner && (
+        <div className="fixed inset-0 bg-[#0F172A]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-[#1E40AF]">
+                  <Edit2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#0F172A]">
+                    거래처 & 판매 채널 정보 수정
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    기존 상호: {editingPartner.company_name} | 채널: {editingPartner.channel_type}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingPartner(null)}
+                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditPartner} className="mt-4 space-y-3.5">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  법인 / 거래처 / 플랫폼 상호명 *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="예: (주)알파테크 또는 네이버 스마트스토어"
+                  value={editPartnerForm.company_name}
+                  onChange={(e) => setEditPartnerForm(prev => ({ ...prev, company_name: e.target.value }))}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    채널 유형 (Channel Type) *
+                  </label>
+                  <select
+                    value={editPartnerForm.channel_type}
+                    onChange={(e) => setEditPartnerForm(prev => ({ ...prev, channel_type: e.target.value }))}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium cursor-pointer"
+                  >
+                    <option value="B2B">B2B (세금계산서)</option>
+                    <option value="SMARTSTORE">SMARTSTORE (네이버 스마트스토어)</option>
+                    <option value="COUPANG">COUPANG (쿠팡 로켓배송 / 윙)</option>
+                    <option value="OWN_MALL">OWN_MALL (자사몰 / PG 정산사)</option>
+                    <option value="OPEN_MARKET">OPEN_MARKET (11번가 / G마켓 등 오픈마켓)</option>
+                    <option value="OFFLINE">OFFLINE (오프라인 매장 / 직영점)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    대표자명 / 적요 매칭 키 *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="예: 홍길동 (식별자)"
+                    value={editPartnerForm.ceo_name}
+                    onChange={(e) => setEditPartnerForm(prev => ({ ...prev, ceo_name: e.target.value }))}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    사업자등록번호
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="예: 120-81-12345"
+                    value={editPartnerForm.business_number}
+                    onChange={(e) => setEditPartnerForm(prev => ({ ...prev, business_number: e.target.value }))}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    미수금 / 정산 잔액 (₩)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="0"
+                    value={editPartnerForm.uncollected}
+                    onChange={(e) => setEditPartnerForm(prev => ({ ...prev, uncollected: Number(e.target.value) || 0 }))}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">
+                    통장 적요 교차 대조 활성화
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    입금 통장의 적요란에 대표자명/식별키가 찍히면 해당 거래처로 자동 매칭합니다.
+                  </span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editPartnerForm.alias_active}
+                    onChange={(e) => setEditPartnerForm(prev => ({ ...prev, alias_active: e.target.checked }))}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#1E40AF]"></div>
+                </label>
+              </div>
+
+              <div className="text-[11px] text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+                💡 상호명이나 채널 유형을 변경하면 귀속된 기존 주문 데이터와 상단 글로벌 필터 드롭다운도 실시간으로 일괄 동기화됩니다.
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingPartner(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-[#1E40AF] hover:bg-blue-800 text-white text-xs font-bold rounded-xl transition shadow-sm active:scale-95"
+                >
+                  수정 내용 저장
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ============================================================== */}
       {/* 9-1. 대시보드 매출 원장 주문 상세 수정 모달 (차감 내역 포함)          */}
       {/* ============================================================== */}
