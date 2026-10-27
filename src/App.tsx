@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { 
   ShieldCheck, 
@@ -549,6 +549,7 @@ export default function App() {
     { id: 'p-3', company_name: '(주)감마글로벌', business_number: '305-86-54321', ceo_name: '김철수', channel_type: 'B2B', uncollected: 5000000, last_deal: '2026-09-05', alias_active: true },
     { id: 'p-4', company_name: '네이버 스마트스토어', business_number: '000-00-00001', ceo_name: '네이버(주)', channel_type: 'SMARTSTORE', uncollected: 0, last_deal: '2026-10-15', alias_active: false },
     { id: 'p-5', company_name: '쿠팡 로켓배송', business_number: '000-00-00002', ceo_name: '쿠팡(주)', channel_type: 'COUPANG', uncollected: 0, last_deal: '2026-10-10', alias_active: false },
+    { id: 'p-6', company_name: '공식 자사몰 (아임웹/토스PG)', business_number: '110-85-99881', ceo_name: '토스페이먼츠(주)', channel_type: 'OWN_MALL', uncollected: 0, last_deal: '2026-10-18', alias_active: false },
   ]);
 
   const [auditLogs, setAuditLogs] = useState<any[]>([
@@ -609,6 +610,38 @@ export default function App() {
   }, [currentRole]);
 
   // 검색 및 채널 필터 적용
+  // 채널 한글 명칭 변환 헬퍼
+  const getChannelDisplayName = (ch: string) => {
+    switch (ch) {
+      case 'ALL': return '전체 채널';
+      case 'SMARTSTORE': return '스마트스토어';
+      case 'COUPANG': return '쿠팡 로켓';
+      case 'B2B': return 'B2B 도매';
+      case 'OWN_MALL': return '자사몰 PG';
+      case 'OPEN_MARKET': return '오픈마켓';
+      case 'OFFLINE': return '오프라인';
+      default: return ch;
+    }
+  };
+
+  // 등록된 모든 채널 유형을 동적으로 추출하여 상단 필터 옵션으로 제공
+  const dynamicChannelOptions = useMemo(() => {
+    const channelSet = new Set<string>(['ALL', 'SMARTSTORE', 'COUPANG', 'B2B', 'OWN_MALL']);
+    partnersList.forEach(p => {
+      if (p.channel_type) channelSet.add(p.channel_type);
+    });
+    salesRecords.forEach(s => {
+      if (s.business_partners?.channel_type) {
+        channelSet.add(s.business_partners.channel_type);
+      }
+    });
+
+    return Array.from(channelSet).map(val => ({
+      value: val,
+      label: getChannelDisplayName(val)
+    }));
+  }, [partnersList, salesRecords]);
+
   const filteredSales = salesRecords.filter(s => {
     const matchChannel = channelFilter === 'ALL' || s.business_partners?.channel_type === channelFilter;
     const matchQuery = !searchQuery || 
@@ -1735,10 +1768,11 @@ export default function App() {
                 onChange={(e) => setChannelFilter(e.target.value)}
                 className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
               >
-                <option value="ALL">전체 채널</option>
-                <option value="SMARTSTORE">스마트스토어</option>
-                <option value="COUPANG">쿠팡 로켓</option>
-                <option value="B2B">B2B</option>
+                {dynamicChannelOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -4281,9 +4315,15 @@ export default function App() {
               <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
                 <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-slate-100">
                   <div>
-                    <h2 className="text-lg font-bold text-[#0F172A] flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-[#0F172A] flex items-center gap-2 flex-wrap">
                       <Building2 className="w-5 h-5 text-[#1E40AF]" />
-                      거래처 & 판매 채널 관리
+                      <span>거래처 & 판매 채널 관리</span>
+                      {channelFilter !== 'ALL' && (
+                        <span className="text-xs font-semibold text-[#1E40AF] bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200 flex items-center gap-1 font-normal">
+                          필터: {getChannelDisplayName(channelFilter)}
+                          <button onClick={() => setChannelFilter('ALL')} className="hover:text-rose-600 font-bold ml-0.5" title="필터 해제">✕</button>
+                        </span>
+                      )}
                     </h2>
                     <p className="text-xs text-slate-400 mt-1">
                       B2B 세금계산서 거래처부터 오픈마켓(네이버/쿠팡), 자사몰 PG사까지 모든 채널의 정산 정보와 대표자명을 통합 맵핑합니다.
@@ -4314,6 +4354,7 @@ export default function App() {
                     <tbody className="divide-y divide-slate-100">
                       {partnersList
                         .filter(p => {
+                          if (channelFilter !== 'ALL' && p.channel_type !== channelFilter) return false;
                           if (!searchQuery.trim()) return true;
                           const q = searchQuery.toLowerCase();
                           return (
