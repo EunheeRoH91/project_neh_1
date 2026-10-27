@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { 
+import {
+  Plus,
+  Globe,
   ShieldCheck, 
   BarChart3, 
   AlertTriangle, 
@@ -482,6 +484,24 @@ const INITIAL_RISKS = [
   { id: 'r-10', order_key: 'INV-20260905-005', risk_category: 'ETC', amount: 200000, description: '납품 일정 지연에 따른 지체상금 공제' }
 ];
 
+export interface ChannelMaster {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  reconcileType: '2STEP' | 'ALIAS';
+  badgeColor: 'blue' | 'emerald' | 'orange' | 'purple' | 'amber' | 'teal';
+}
+
+export const INITIAL_CHANNELS: ChannelMaster[] = [
+  { id: 'ch-1', code: 'B2B', name: 'B2B 도매 (세금계산서)', description: '세금계산서 발행 및 통장 적요 대표자명 매칭', reconcileType: 'ALIAS', badgeColor: 'blue' },
+  { id: 'ch-2', code: 'SMARTSTORE', name: '네이버 스마트스토어', description: 'Npay 주문 연동 및 2-Step 덩어리 정산 대사', reconcileType: '2STEP', badgeColor: 'emerald' },
+  { id: 'ch-3', code: 'COUPANG', name: '쿠팡 로켓배송', description: '쿠팡 로켓/윙 주정산 및 월정산 덩어리 대사', reconcileType: '2STEP', badgeColor: 'orange' },
+  { id: 'ch-4', code: 'OWN_MALL', name: '자사몰 PG (아임웹/토스)', description: '공식 자사몰 토스페이먼츠 PG 정산', reconcileType: '2STEP', badgeColor: 'purple' },
+  { id: 'ch-5', code: 'OPEN_MARKET', name: '오픈마켓 (11번가/G마켓)', description: '종합 오픈마켓 11번가, G마켓, 옥션 입점 정산', reconcileType: '2STEP', badgeColor: 'amber' },
+  { id: 'ch-6', code: 'OFFLINE', name: '오프라인 매장', description: '직영 매장 POS 결제 및 VAN사 대사', reconcileType: 'ALIAS', badgeColor: 'teal' },
+];
+
 export default function App() {
   const [currentRole, setCurrentRole] = useState<UserRole>('admin');
   const [activeTab, setActiveTab] = useState<'dashboard' | 'reconciliation' | 'suspense' | 'partners'>('dashboard');
@@ -605,7 +625,33 @@ export default function App() {
   const [showNewPartnerModal, setShowNewPartnerModal] = useState<boolean>(false);
   const [newPartnerForm, setNewPartnerForm] = useState({ company_name: '', ceo_name: '', business_number: '', channel_type: 'B2B' });
 
-  // Phase 2: 거래처 & 판매 채널 정보 수정 모달 상태
+  // 1) 판매 채널(Channel) 마스터 상태
+  const [channelsList, setChannelsList] = useState<ChannelMaster[]>(INITIAL_CHANNELS);
+
+  // 2) 채널 생성 모달 상태
+  const [showNewChannelModal, setShowNewChannelModal] = useState<boolean>(false);
+  const [newChannelForm, setNewChannelForm] = useState({
+    code: '',
+    name: '',
+    description: '',
+    reconcileType: '2STEP' as '2STEP' | 'ALIAS',
+    badgeColor: 'blue' as 'blue' | 'emerald' | 'orange' | 'purple' | 'amber' | 'teal'
+  });
+
+  // 3) 채널 수정 모달 상태
+  const [editingChannel, setEditingChannel] = useState<ChannelMaster | null>(null);
+  const [editChannelForm, setEditChannelForm] = useState({
+    code: '',
+    name: '',
+    description: '',
+    reconcileType: '2STEP' as '2STEP' | 'ALIAS',
+    badgeColor: 'blue' as 'blue' | 'emerald' | 'orange' | 'purple' | 'amber' | 'teal'
+  });
+
+  // 4) 채널 삭제 확인 모달 상태
+  const [deletingChannel, setDeletingChannel] = useState<ChannelMaster | null>(null);
+
+  // 5) 거래처 수정 모달 상태
   const [editingPartner, setEditingPartner] = useState<any | null>(null);
   const [editPartnerForm, setEditPartnerForm] = useState({
     company_name: '',
@@ -615,6 +661,9 @@ export default function App() {
     uncollected: 0,
     alias_active: true
   });
+
+  // 6) 거래처 삭제 확인 모달 상태 (Phase 3)
+  const [deletingPartner, setDeletingPartner] = useState<any | null>(null);
 
   const [partnersList, setPartnersList] = useState<any[]>([
     { id: 'p-1', company_name: '(주)알파테크', business_number: '120-81-12345', ceo_name: '홍길동', channel_type: 'B2B', uncollected: 15000000, last_deal: '2026-10-05', alias_active: true },
@@ -685,35 +734,43 @@ export default function App() {
   // 검색 및 채널 필터 적용
   // 채널 한글 명칭 변환 헬퍼
   const getChannelDisplayName = (ch: string) => {
-    switch (ch) {
-      case 'ALL': return '전체 채널';
-      case 'SMARTSTORE': return '스마트스토어';
-      case 'COUPANG': return '쿠팡 로켓';
-      case 'B2B': return 'B2B 도매';
-      case 'OWN_MALL': return '자사몰 PG';
-      case 'OPEN_MARKET': return '오픈마켓';
-      case 'OFFLINE': return '오프라인';
-      default: return ch;
-    }
+    if (ch === 'ALL') return '전체 채널';
+    const found = channelsList.find(c => c.code === ch);
+    return found ? found.name : ch;
   };
 
-  // 등록된 모든 채널 유형을 동적으로 추출하여 상단 필터 옵션으로 제공
+  // 등록된 채널 마스터 목록을 기반으로 상단 필터 옵션 동적 제공
   const dynamicChannelOptions = useMemo(() => {
-    const channelSet = new Set<string>(['ALL', 'SMARTSTORE', 'COUPANG', 'B2B', 'OWN_MALL']);
-    partnersList.forEach(p => {
-      if (p.channel_type) channelSet.add(p.channel_type);
+    const options = [{ value: 'ALL', label: '전체 채널' }];
+    channelsList.forEach(c => {
+      options.push({ value: c.code, label: c.name });
     });
-    salesRecords.forEach(s => {
-      if (s.business_partners?.channel_type) {
-        channelSet.add(s.business_partners.channel_type);
-      }
-    });
+    return options;
+  }, [channelsList]);
 
-    return Array.from(channelSet).map(val => ({
-      value: val,
-      label: getChannelDisplayName(val)
-    }));
-  }, [partnersList, salesRecords]);
+  // 채널 배지 컴포넌트 렌더러
+  const getChannelBadge = (ch: string) => {
+    const found = channelsList.find(c => c.code === ch);
+    const label = found ? found.name : getChannelDisplayName(ch);
+    const color = found ? found.badgeColor : 'blue';
+
+    const colorClasses: Record<string, string> = {
+      blue: 'bg-blue-50 text-[#1E40AF] border-blue-200',
+      emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      orange: 'bg-orange-50 text-orange-700 border-orange-200',
+      purple: 'bg-purple-50 text-purple-700 border-purple-200',
+      amber: 'bg-amber-50 text-amber-700 border-amber-200',
+      teal: 'bg-teal-50 text-teal-700 border-teal-200'
+    };
+
+    const style = colorClasses[color] || 'bg-slate-100 text-slate-700 border-slate-200';
+
+    return (
+      <span className={`px-2.5 py-0.5 rounded-md font-bold text-[11px] border whitespace-nowrap inline-block ${style}`}>
+        {label}
+      </span>
+    );
+  };
 
   const filteredSales = salesRecords.filter(s => {
     const matchChannel = channelFilter === 'ALL' || s.business_partners?.channel_type === channelFilter;
@@ -1111,6 +1168,159 @@ export default function App() {
       uncollected: p.uncollected || 0,
       alias_active: p.alias_active ?? true
     });
+  };
+
+  // === 채널 마스터(Channel) CRUD 핸들러 ===
+  const handleAddNewChannel = (e: React.FormEvent) => {
+    e.preventDefault();
+    const rawCode = newChannelForm.code.trim().toUpperCase().replace(/\s+/g, '_');
+    const rawName = newChannelForm.name.trim();
+    if (!rawCode || !rawName) {
+      alert('채널 식별 코드와 채널명은 필수 항목입니다.');
+      return;
+    }
+
+    if (channelsList.some(c => c.code === rawCode)) {
+      alert('이미 동일한 식별 코드의 채널이 존재합니다: ' + rawCode);
+      return;
+    }
+
+    const created: ChannelMaster = {
+      id: `ch-${Date.now()}`,
+      code: rawCode,
+      name: rawName,
+      description: newChannelForm.description.trim() || '사용자 정의 판매 채널',
+      reconcileType: newChannelForm.reconcileType,
+      badgeColor: newChannelForm.badgeColor
+    };
+
+    setChannelsList(prev => [...prev, created]);
+    setShowNewChannelModal(false);
+    setNewChannelForm({ code: '', name: '', description: '', reconcileType: '2STEP', badgeColor: 'blue' });
+
+    const newAudit = {
+      id: `a-${Date.now()}`,
+      action_type: 'CHANNEL_CREATED',
+      target_id: created.code,
+      actor_email: currentRole === 'admin' ? 'admin@finance.corp' : 'user@finance.corp',
+      actor_role: currentRole,
+      memo: `신규 판매 채널 생성 완료: [${created.name}] (코드: ${created.code}, 대사방식: ${created.reconcileType})`,
+      amount: 0,
+      created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    };
+    setAuditLogs(prev => [newAudit, ...prev]);
+
+    setActionSuccessMsg(`[채널 생성 완료] '${created.name}' (${created.code}) 채널이 등록되어 전체 시스템에 즉시 반영되었습니다.`);
+    setTimeout(() => setActionSuccessMsg(''), 4500);
+  };
+
+  const handleOpenEditChannel = (ch: ChannelMaster) => {
+    setEditingChannel(ch);
+    setEditChannelForm({
+      code: ch.code,
+      name: ch.name,
+      description: ch.description,
+      reconcileType: ch.reconcileType,
+      badgeColor: ch.badgeColor
+    });
+  };
+
+  const handleSaveEditChannel = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingChannel) return;
+    const newName = editChannelForm.name.trim();
+    if (!newName) {
+      alert('채널명은 필수 입력 항목입니다.');
+      return;
+    }
+
+    const oldCode = editingChannel.code;
+    const oldName = editingChannel.name;
+
+    // 1. 채널 목록 업데이트
+    setChannelsList(prev => prev.map(c => {
+      if (c.id === editingChannel.id) {
+        return {
+          ...c,
+          name: newName,
+          description: editChannelForm.description.trim(),
+          reconcileType: editChannelForm.reconcileType,
+          badgeColor: editChannelForm.badgeColor
+        };
+      }
+      return c;
+    }));
+
+    // 2. 감사 로그 기록
+    const newAudit = {
+      id: `a-${Date.now()}`,
+      action_type: 'CHANNEL_UPDATED',
+      target_id: oldCode,
+      actor_email: currentRole === 'admin' ? 'admin@finance.corp' : 'user@finance.corp',
+      actor_role: currentRole,
+      memo: `판매 채널 정보 수정: [${oldName}] ➔ [${newName}] (대사방식: ${editChannelForm.reconcileType})`,
+      amount: 0,
+      created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    };
+    setAuditLogs(prev => [newAudit, ...prev]);
+
+    setActionSuccessMsg(`[채널 수정 완료] '${newName}' 채널 정보가 성공적으로 반영되었습니다.`);
+    setTimeout(() => setActionSuccessMsg(''), 4500);
+    setEditingChannel(null);
+  };
+
+  const handleDeleteChannelConfirm = () => {
+    if (!deletingChannel) return;
+    const partnerCount = partnersList.filter(p => p.channel_type === deletingChannel.code).length;
+    if (partnerCount > 0) {
+      alert(`해당 채널에 소속된 거래처가 ${partnerCount}개사 존재하여 삭제할 수 없습니다. 소속 거래처의 채널을 먼저 변경해 주세요.`);
+      return;
+    }
+
+    const targetCode = deletingChannel.code;
+    const targetName = deletingChannel.name;
+    setChannelsList(prev => prev.filter(c => c.code !== targetCode));
+    setDeletingChannel(null);
+
+    const newAudit = {
+      id: `a-${Date.now()}`,
+      action_type: 'CHANNEL_DELETED',
+      target_id: targetCode,
+      actor_email: currentRole === 'admin' ? 'admin@finance.corp' : 'user@finance.corp',
+      actor_role: currentRole,
+      memo: `판매 채널 삭제 완료: [${targetName}] (${targetCode})`,
+      amount: 0,
+      created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    };
+    setAuditLogs(prev => [newAudit, ...prev]);
+
+    setActionSuccessMsg(`[채널 삭제 완료] '${targetName}' 채널이 성공적으로 삭제되었습니다.`);
+    setTimeout(() => setActionSuccessMsg(''), 4500);
+  };
+
+  // === 거래처 안전 삭제 (Phase 3) ===
+  const handleDeletePartnerConfirm = () => {
+    if (!deletingPartner) return;
+    const targetName = deletingPartner.company_name;
+    const targetUncollected = Number(deletingPartner.uncollected || 0);
+
+    setPartnersList(prev => prev.filter(p => p.id !== deletingPartner.id));
+    setDeletingPartner(null);
+
+    const newAudit = {
+      id: `a-${Date.now()}`,
+      action_type: 'PARTNER_DELETED',
+      target_id: targetName,
+      actor_email: currentRole === 'admin' ? 'admin@finance.corp' : 'user@finance.corp',
+      actor_role: currentRole,
+      memo: `거래처 삭제 완료: [${targetName}] (삭제 당시 미수금: ₩${targetUncollected.toLocaleString()})`,
+      amount: targetUncollected,
+      created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    };
+    setAuditLogs(prev => [newAudit, ...prev]);
+
+    setActionSuccessMsg(`[거래처 삭제 완료] '${targetName}' 거래처가 원장에서 성공적으로 제거되었습니다.`);
+    setTimeout(() => setActionSuccessMsg(''), 4500);
   };
 
   // Phase 2: 거래처 및 판매 채널 정보 수정 저장
@@ -4720,15 +4930,102 @@ export default function App() {
             </div>
           ) : (
             /* ============================================================== */
-            /* 5.1. 전사 거래처 & 채널 마스터 (다채널 맵핑 관리)              */
+            /* 5.1. 전사 거래처 & 채널 마스터 (채널 관리 및 거래처 관리 분리) */
             /* ============================================================== */
             <div className="space-y-6">
+              {/* 섹션 1: 판매 채널(Channel) 마스터 관리 */}
+              <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+                <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                  <div>
+                    <h2 className="text-base font-bold text-[#0F172A] flex items-center gap-2">
+                      <Globe className="w-5 h-5 text-[#1E40AF]" />
+                      <span>판매 채널(Channel) 마스터 관리</span>
+                      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-[#1E40AF] border border-blue-200 font-mono">
+                        총 {channelsList.length}개 채널
+                      </span>
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-1">
+                      매출 및 정산이 발생하는 채널(플랫폼 분류) 자체를 직접 추가, 수정, 삭제합니다. 채널명 수정 시 전체 원장에 실시간 동기화됩니다.
+                    </p>
+                  </div>
+
+                  <button
+                    disabled={currentRole === 'viewer'}
+                    onClick={() => {
+                      setNewChannelForm({ code: '', name: '', description: '', reconcileType: '2STEP', badgeColor: 'blue' });
+                      setShowNewChannelModal(true);
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-[#1E40AF] hover:bg-blue-800 disabled:opacity-40 text-white font-bold text-xs shadow-xs transition flex items-center gap-2 active:scale-[0.98] whitespace-nowrap"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ 신규 채널 생성</span>
+                  </button>
+                </div>
+
+                {/* 채널 카드 그리드 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 mt-4">
+                  {channelsList.map(ch => {
+                    const partnerCount = partnersList.filter(p => p.channel_type === ch.code).length;
+                    return (
+                      <div 
+                        key={ch.id} 
+                        className="p-4 rounded-xl border border-slate-200/80 bg-[#F8FAFC]/60 hover:bg-white hover:border-blue-300 hover:shadow-sm transition"
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {getChannelBadge(ch.code)}
+                            <span className="font-mono text-[10px] text-slate-400 font-bold shrink-0">
+                              [{ch.code}]
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              disabled={currentRole === 'viewer'}
+                              onClick={() => handleOpenEditChannel(ch)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-[#1E40AF] hover:bg-blue-50 transition border border-transparent hover:border-blue-200"
+                              title="채널 정보 수정"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              disabled={currentRole === 'viewer'}
+                              onClick={() => setDeletingChannel(ch)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition border border-transparent hover:border-rose-200"
+                              title="채널 삭제"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-slate-600 line-clamp-2 min-h-[32px] leading-relaxed">
+                          {ch.description}
+                        </p>
+
+                        <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 whitespace-nowrap">
+                          <span className="font-medium text-slate-600">
+                            대사: {ch.reconcileType === 'ALIAS' ? '통장 적요 매칭' : '2-Step 덩어리 대사'}
+                          </span>
+                          <span className="font-bold text-[#1E40AF] bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                            소속 거래처 {partnerCount}개사
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 섹션 2: 거래처 & 판매 채널 입점사(Partner) 관리 */}
               <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
                 <div className="flex flex-wrap items-center justify-between gap-4 pb-5 border-b border-slate-100">
                   <div>
-                    <h2 className="text-lg font-bold text-[#0F172A] flex items-center gap-2 flex-wrap">
+                    <h2 className="text-base font-bold text-[#0F172A] flex items-center gap-2 flex-wrap">
                       <Building2 className="w-5 h-5 text-[#1E40AF]" />
-                      <span>거래처 & 판매 채널 관리</span>
+                      <span>거래처 & 입점사 목록</span>
+                      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-mono">
+                        총 {partnersList.length}개사
+                      </span>
                       {channelFilter !== 'ALL' && (
                         <span className="text-xs font-semibold text-[#1E40AF] bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200 flex items-center gap-1 font-normal">
                           필터: {getChannelDisplayName(channelFilter)}
@@ -4737,30 +5034,35 @@ export default function App() {
                       )}
                     </h2>
                     <p className="text-xs text-slate-400 mt-1">
-                      B2B 세금계산서 거래처부터 오픈마켓(네이버/쿠팡), 자사몰 PG사까지 모든 채널의 정산 정보와 대표자명을 통합 맵핑합니다.
+                      채널별 입점 거래처의 상호명, 소속 채널, 대표자명(적요 매칭 키)을 관리하고 수정/삭제합니다.
                     </p>
                   </div>
 
                   <button
                     disabled={currentRole === 'viewer'}
-                    onClick={() => setShowNewPartnerModal(true)}
-                    className="px-4 py-2.5 rounded-xl bg-[#1E40AF] hover:bg-blue-800 disabled:opacity-40 text-white font-bold text-xs shadow-xs transition flex items-center gap-2 active:scale-[0.98]"
+                    onClick={() => {
+                      setNewPartnerForm({ company_name: '', ceo_name: '', business_number: '', channel_type: channelsList[0]?.code || 'B2B' });
+                      setShowNewPartnerModal(true);
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-[#1E40AF] hover:bg-blue-800 disabled:opacity-40 text-white font-bold text-xs shadow-xs transition flex items-center gap-2 active:scale-[0.98] whitespace-nowrap"
                   >
-                    <span>+ 신규 거래처 & 판매 채널 등록</span>
+                    <Plus className="w-4 h-4" />
+                    <span>+ 신규 거래처 등록</span>
                   </button>
                 </div>
 
-                <div className="overflow-x-auto mt-5">
-                  <table className="w-full text-left text-xs">
+                {/* 한 줄로 깔끔하게 떨어지는 거래처 테이블 (whitespace-nowrap) */}
+                <div className="overflow-x-auto mt-4">
+                  <table className="w-full text-left text-xs whitespace-nowrap">
                     <thead className="bg-[#F8FAFC] text-slate-500 font-bold border-b border-slate-200 uppercase tracking-wider">
                       <tr>
-                        <th className="px-5 py-3.5">법인 / 거래처 / 플랫폼명</th>
-                        <th className="px-5 py-3.5">채널 유형 (Channel)</th>
-                        <th className="px-5 py-3.5">대표자명 / 정산 식별자 (적요 매칭 키)</th>
-                        <th className="px-5 py-3.5">사업자등록번호</th>
-                        <th className="px-5 py-3.5 text-right">미수금 / 정산 잔액</th>
-                        <th className="px-5 py-3.5 text-center">정산 대조 상태</th>
-                        <th className="px-5 py-3.5 text-center">관리</th>
+                        <th className="px-5 py-3.5 whitespace-nowrap">법인 / 거래처 / 플랫폼명</th>
+                        <th className="px-5 py-3.5 whitespace-nowrap">소속 채널 (Channel)</th>
+                        <th className="px-5 py-3.5 whitespace-nowrap">대표자명 / 정산 식별자 (적요 매칭 키)</th>
+                        <th className="px-5 py-3.5 whitespace-nowrap">사업자등록번호</th>
+                        <th className="px-5 py-3.5 text-right whitespace-nowrap">미수금 / 정산 잔액</th>
+                        <th className="px-5 py-3.5 text-center whitespace-nowrap">정산 대조 상태</th>
+                        <th className="px-5 py-3.5 text-center whitespace-nowrap">관리</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -4776,72 +5078,63 @@ export default function App() {
                             p.channel_type.toLowerCase().includes(q)
                           );
                         })
-                        .map((p) => {
-                          const getChannelBadge = (ch: string) => {
-                            switch (ch) {
-                              case 'B2B':
-                                return <span className="px-2.5 py-1 rounded-md bg-blue-50 text-[#1E40AF] font-bold text-[11px] border border-blue-200">B2B</span>;
-                              case 'SMARTSTORE':
-                                return <span className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 font-bold text-[11px] border border-emerald-200">스마트스토어</span>;
-                              case 'COUPANG':
-                                return <span className="px-2.5 py-1 rounded-md bg-orange-50 text-orange-700 font-bold text-[11px] border border-orange-200">쿠팡 로켓</span>;
-                              case 'OWN_MALL':
-                                return <span className="px-2.5 py-1 rounded-md bg-purple-50 text-purple-700 font-bold text-[11px] border border-purple-200">자사몰 PG</span>;
-                              case 'OPEN_MARKET':
-                                return <span className="px-2.5 py-1 rounded-md bg-amber-50 text-amber-700 font-bold text-[11px] border border-amber-200">오픈마켓</span>;
-                              case 'OFFLINE':
-                                return <span className="px-2.5 py-1 rounded-md bg-teal-50 text-teal-700 font-bold text-[11px] border border-teal-200">오프라인 매장</span>;
-                              default:
-                                return <span className="px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 font-semibold text-[11px]">{ch}</span>;
-                            }
-                          };
-
-                          return (
-                            <tr key={p.id} className="hover:bg-slate-50/80 transition">
-                              <td className="px-5 py-4 font-bold text-[#0F172A] text-sm">
-                                {p.company_name}
-                              </td>
-                              <td className="px-5 py-4">
-                                {getChannelBadge(p.channel_type)}
-                              </td>
-                              <td className="px-5 py-4">
-                                <span className="font-bold text-[#1E40AF] bg-blue-50/80 px-2 py-1 rounded-md border border-blue-100">
-                                  {p.ceo_name}
+                        .map((p) => (
+                          <tr key={p.id} className="hover:bg-slate-50/80 transition">
+                            <td className="px-5 py-4 font-bold text-[#0F172A] text-sm whitespace-nowrap">
+                              {p.company_name}
+                            </td>
+                            <td className="px-5 py-4 whitespace-nowrap">
+                              {getChannelBadge(p.channel_type)}
+                            </td>
+                            <td className="px-5 py-4 whitespace-nowrap">
+                              <span className="font-bold text-[#1E40AF] bg-blue-50/80 px-2.5 py-1 rounded-md border border-blue-100 whitespace-nowrap inline-block">
+                                {p.ceo_name}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4 font-mono text-slate-500 whitespace-nowrap">
+                              {p.business_number || '-'}
+                            </td>
+                            <td className="px-5 py-4 text-right font-mono font-bold text-slate-900 whitespace-nowrap">
+                              ₩ {Number(p.uncollected || 0).toLocaleString()}
+                            </td>
+                            <td className="px-5 py-4 text-center whitespace-nowrap">
+                              {p.alias_active ? (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+                                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>교차 매칭 활성</span>
                                 </span>
-                              </td>
-                              <td className="px-5 py-4 font-mono text-slate-500">{p.business_number}</td>
-                              <td className="px-5 py-4 text-right font-mono font-bold text-slate-900">
-                                ₩ {Number(p.uncollected || 0).toLocaleString()}
-                              </td>
-                              <td className="px-5 py-4 text-center">
-                                {p.alias_active ? (
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                    <Check className="w-3 h-3" />
-                                    교차 매칭 활성
-                                  </span>
-                                ) : (
-                                  <span className="text-slate-400 text-[11px]">2-Step 덩어리 대조</span>
-                                )}
-                              </td>
-                              <td className="px-5 py-4 text-center">
+                              ) : (
+                                <span className="text-slate-400 text-[11px] whitespace-nowrap">2-Step 덩어리 대조</span>
+                              )}
+                            </td>
+                            <td className="px-5 py-4 text-center whitespace-nowrap">
+                              <div className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
                                 <button
                                   disabled={currentRole === 'viewer'}
                                   onClick={() => handleOpenEditPartner(p)}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-blue-50 text-slate-700 hover:text-[#1E40AF] border border-slate-200 hover:border-blue-300 transition shadow-xs active:scale-95 disabled:opacity-40"
-                                  title="거래처 및 판매 채널 정보 수정"
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-blue-50 text-slate-700 hover:text-[#1E40AF] border border-slate-200 hover:border-blue-300 transition shadow-2xs active:scale-95 disabled:opacity-40 whitespace-nowrap"
+                                  title="거래처 정보 수정"
                                 >
                                   <Edit2 className="w-3.5 h-3.5 text-[#1E40AF]" />
                                   <span>수정</span>
                                 </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
+                                <button
+                                  disabled={currentRole === 'viewer'}
+                                  onClick={() => setDeletingPartner(p)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 border border-slate-200 hover:border-rose-300 transition shadow-2xs active:scale-95 disabled:opacity-40 whitespace-nowrap"
+                                  title="거래처 삭제"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                  <span>삭제</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
-              </div>
-            </div>
+              </div>            </div>
           )}
         </main>
       </div>
@@ -5093,12 +5386,11 @@ export default function App() {
                   onChange={(e) => setNewPartnerForm(prev => ({ ...prev, channel_type: e.target.value }))}
                   className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium cursor-pointer"
                 >
-                  <option value="B2B">B2B (세금계산서)</option>
-                  <option value="SMARTSTORE">SMARTSTORE (네이버 스마트스토어)</option>
-                  <option value="COUPANG">COUPANG (쿠팡 로켓배송 / 윙)</option>
-                  <option value="OWN_MALL">OWN_MALL (자사몰 / PG 정산사)</option>
-                  <option value="OPEN_MARKET">OPEN_MARKET (11번가 / G마켓 등 오픈마켓)</option>
-                  <option value="OFFLINE">OFFLINE (오프라인 매장 / 직영점)</option>
+                  {channelsList.map(ch => (
+                    <option key={ch.id} value={ch.code}>
+                      {ch.name} ({ch.code})
+                    </option>
+                  ))}
                 </select>
                 <span className="text-[11px] text-slate-400 block mt-1">
                   💡 B2B는 적요 교차 매칭 키로 연동되며, 오픈마켓/자사몰은 2-Step 덩어리 대조 배치로 연동됩니다.
@@ -5207,12 +5499,11 @@ export default function App() {
                     onChange={(e) => setEditPartnerForm(prev => ({ ...prev, channel_type: e.target.value }))}
                     className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium cursor-pointer"
                   >
-                    <option value="B2B">B2B (세금계산서)</option>
-                    <option value="SMARTSTORE">SMARTSTORE (네이버 스마트스토어)</option>
-                    <option value="COUPANG">COUPANG (쿠팡 로켓배송 / 윙)</option>
-                    <option value="OWN_MALL">OWN_MALL (자사몰 / PG 정산사)</option>
-                    <option value="OPEN_MARKET">OPEN_MARKET (11번가 / G마켓 등 오픈마켓)</option>
-                    <option value="OFFLINE">OFFLINE (오프라인 매장 / 직영점)</option>
+                    {channelsList.map(ch => (
+                      <option key={ch.id} value={ch.code}>
+                        {ch.name} ({ch.code})
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -5303,6 +5594,348 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* ============================================================== */}
+      {/* 8-3. 신규 판매 채널(Channel) 생성 모달                          */}
+      {/* ============================================================== */}
+      {showNewChannelModal && (
+        <div className="fixed inset-0 bg-[#0F172A]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Globe className="w-5 h-5 text-[#1E40AF]" />
+                <h3 className="text-base font-bold text-[#0F172A]">신규 판매 채널(Channel) 생성</h3>
+              </div>
+              <button
+                onClick={() => setShowNewChannelModal(false)}
+                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddNewChannel} className="mt-4 space-y-3.5">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  채널 식별 코드 (영문 대문자, 중복 불가) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="예: KAKAO_SHOPPING 또는 LIVE_COMMERCE"
+                  value={newChannelForm.code}
+                  onChange={(e) => setNewChannelForm(prev => ({ ...prev, code: e.target.value.toUpperCase() }))}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-mono font-bold"
+                />
+                <span className="text-[11px] text-slate-400 block mt-1">
+                  시스템 내부 식별 키로 사용됩니다.
+                </span>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  채널 표시명 (화면 표시 이름) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="예: 카카오 쇼핑하기 또는 틱톡 라이브"
+                  value={newChannelForm.name}
+                  onChange={(e) => setNewChannelForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    정산 대사 방식 *
+                  </label>
+                  <select
+                    value={newChannelForm.reconcileType}
+                    onChange={(e) => setNewChannelForm(prev => ({ ...prev, reconcileType: e.target.value as any }))}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium"
+                  >
+                    <option value="2STEP">2-Step 덩어리 대조</option>
+                    <option value="ALIAS">통장 적요 대표자 매칭</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    배지 색상 테마 *
+                  </label>
+                  <select
+                    value={newChannelForm.badgeColor}
+                    onChange={(e) => setNewChannelForm(prev => ({ ...prev, badgeColor: e.target.value as any }))}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium"
+                  >
+                    <option value="blue">블루 (Blue)</option>
+                    <option value="emerald">에메랄드 (Green)</option>
+                    <option value="orange">오렌지 (Orange)</option>
+                    <option value="purple">퍼플 (Purple)</option>
+                    <option value="amber">앰버 (Yellow)</option>
+                    <option value="teal">틸 (Teal)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  채널 설명 / 정산 주기 메모
+                </label>
+                <input
+                  type="text"
+                  placeholder="예: 매월 10일 정산, 수수료 8% 적용"
+                  value={newChannelForm.description}
+                  onChange={(e) => setNewChannelForm(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowNewChannelModal(false)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-[#1E40AF] hover:bg-blue-800 text-white text-xs font-bold rounded-xl shadow-xs"
+                >
+                  채널 생성하기
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* 8-4. 판매 채널(Channel) 정보 수정 모달                          */}
+      {/* ============================================================== */}
+      {editingChannel && (
+        <div className="fixed inset-0 bg-[#0F172A]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Edit2 className="w-5 h-5 text-[#1E40AF]" />
+                <div>
+                  <h3 className="text-base font-bold text-[#0F172A]">판매 채널(Channel) 정보 수정</h3>
+                  <span className="font-mono text-[11px] text-slate-400 font-bold">코드: {editingChannel.code}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingChannel(null)}
+                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditChannel} className="mt-4 space-y-3.5">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  채널 식별 코드 (고유 키)
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={editingChannel.code}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-500 font-mono font-bold cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  채널 표시명 (화면 표시 이름) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="예: 네이버 스마트스토어"
+                  value={editChannelForm.name}
+                  onChange={(e) => setEditChannelForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    정산 대사 방식 *
+                  </label>
+                  <select
+                    value={editChannelForm.reconcileType}
+                    onChange={(e) => setEditChannelForm(prev => ({ ...prev, reconcileType: e.target.value as any }))}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium"
+                  >
+                    <option value="2STEP">2-Step 덩어리 대조</option>
+                    <option value="ALIAS">통장 적요 대표자 매칭</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    배지 색상 테마 *
+                  </label>
+                  <select
+                    value={editChannelForm.badgeColor}
+                    onChange={(e) => setEditChannelForm(prev => ({ ...prev, badgeColor: e.target.value as any }))}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-medium"
+                  >
+                    <option value="blue">블루 (Blue)</option>
+                    <option value="emerald">에메랄드 (Green)</option>
+                    <option value="orange">오렌지 (Orange)</option>
+                    <option value="purple">퍼플 (Purple)</option>
+                    <option value="amber">앰버 (Yellow)</option>
+                    <option value="teal">틸 (Teal)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  채널 설명 / 정산 정책
+                </label>
+                <input
+                  type="text"
+                  value={editChannelForm.description}
+                  onChange={(e) => setEditChannelForm(prev => ({ ...prev, description: e.target.value }))}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20"
+                />
+              </div>
+
+              <div className="text-[11px] text-amber-700 bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+                💡 채널명을 변경하면 상단 글로벌 필터, 거래처 뱃지 및 원장에 즉시 동기화됩니다.
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingChannel(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-[#1E40AF] hover:bg-blue-800 text-white text-xs font-bold rounded-xl shadow-xs"
+                >
+                  수정 저장
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* 8-5. 판매 채널(Channel) 삭제 확인 모달                          */}
+      {/* ============================================================== */}
+      {deletingChannel && (() => {
+        const linkedPartners = partnersList.filter(p => p.channel_type === deletingChannel.code);
+        const hasPartners = linkedPartners.length > 0;
+        return (
+          <div className="fixed inset-0 bg-[#0F172A]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+            <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+              <div className="flex items-center gap-2.5 pb-4 border-b border-slate-100 text-rose-600">
+                <AlertTriangle className="w-5 h-5 shrink-0" />
+                <h3 className="text-base font-bold text-[#0F172A]">판매 채널 삭제 확인</h3>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                <p className="text-xs text-slate-700 leading-relaxed">
+                  정말로 채널 <strong className="text-rose-600 font-bold">[{deletingChannel.name}] ({deletingChannel.code})</strong>을(를) 삭제하시겠습니까?
+                </p>
+
+                {hasPartners ? (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 leading-relaxed">
+                    ⚠️ <strong>삭제 불가:</strong> 해당 채널에 소속된 거래처가 <strong>{linkedPartners.length}개사</strong> ({linkedPartners.map(p => p.company_name).join(', ')}) 존재합니다.
+                    <br />
+                    소속 거래처의 채널을 먼저 변경하신 후 삭제해 주세요.
+                  </div>
+                ) : (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 leading-relaxed">
+                    💡 소속된 거래처가 없어 안전하게 삭제할 수 있습니다. 삭제 후 상단 필터 및 등록 드롭다운에서 즉시 제외됩니다.
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setDeletingChannel(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  disabled={hasPartners}
+                  onClick={handleDeleteChannelConfirm}
+                  className="px-5 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white text-xs font-bold rounded-xl shadow-xs"
+                >
+                  채널 영구 삭제
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ============================================================== */}
+      {/* 8-6. 거래처(Partner) 안전 삭제 확인 모달 (Phase 3)              */}
+      {/* ============================================================== */}
+      {deletingPartner && (() => {
+        const uncollected = Number(deletingPartner.uncollected || 0);
+        return (
+          <div className="fixed inset-0 bg-[#0F172A]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+            <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+              <div className="flex items-center gap-2.5 pb-4 border-b border-slate-100 text-rose-600">
+                <Trash2 className="w-5 h-5 shrink-0" />
+                <h3 className="text-base font-bold text-[#0F172A]">거래처 안전 삭제 확인</h3>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                <p className="text-xs text-slate-700 leading-relaxed">
+                  정말로 거래처 <strong className="text-rose-600 font-bold">[{deletingPartner.company_name}]</strong>을(를) 원장에서 삭제하시겠습니까?
+                </p>
+
+                {uncollected > 0 ? (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 leading-relaxed">
+                    ⚠️ <strong>미수금 잔액 경고:</strong> 해당 거래처에 정산 미수금 <strong>₩ {uncollected.toLocaleString()}</strong>이 남아있습니다.
+                    삭제 시 정산 대사 통계 및 장부 상 미수금 추적에 영향을 줄 수 있습니다.
+                  </div>
+                ) : (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 leading-relaxed">
+                    ✅ 미수금 잔액이 ₩ 0원으로 정산이 종결된 상태입니다. 안전하게 삭제하실 수 있습니다.
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-4 mt-4 border-t border-slate-100 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setDeletingPartner(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeletePartnerConfirm}
+                  className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs"
+                >
+                  거래처 삭제
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ============================================================== */}
       {/* 9-1. 대시보드 매출 원장 주문 상세 수정 모달 (차감 내역 포함)          */}
