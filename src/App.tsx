@@ -346,6 +346,12 @@ const INITIAL_SALES = [
     sales_date: ord.date,
     due_date: '2026-11-14',
     gross_amount: ord.grossAmount,
+    fee: ord.fee,
+    return_loss: ord.returnLoss,
+    damage: ord.damage,
+    etc: ord.etc || 0,
+    settled_amount: ord.settledAmount,
+    memo: '',
     status: 'PAID',
     business_partners: { company_name: '네이버 스마트스토어', channel_type: 'SMARTSTORE', ceo_name: '네이버(주)' }
   })),
@@ -357,6 +363,12 @@ const INITIAL_SALES = [
     sales_date: ord.date,
     due_date: '2026-11-09',
     gross_amount: ord.grossAmount,
+    fee: ord.fee,
+    return_loss: ord.returnLoss,
+    damage: ord.damage,
+    etc: ord.etc || 0,
+    settled_amount: ord.settledAmount,
+    memo: '',
     status: 'PAID',
     business_partners: { company_name: '쿠팡 로켓배송', channel_type: 'COUPANG', ceo_name: '쿠팡(주)' }
   })),
@@ -505,6 +517,10 @@ export default function App() {
     salesDate: '',
     dueDate: '',
     grossAmount: 0,
+    fee: 0,
+    returnLoss: 0,
+    damage: 0,
+    etc: 0,
     status: 'PAID',
     reason: ''
   });
@@ -1322,6 +1338,14 @@ export default function App() {
   // 4.3 정산 대사 통합 결과 엑셀 다운로드 (보고서 내보내기 & 엑셀 스타일/틀 정돈)
   // 대시보드 주문 상세 수정 모달 열기
   const handleOpenDashboardOrderEdit = (ord: any) => {
+    // 혹시 B2C 데모 주문에 연결된 주문인지 조회
+    const b2cOrder = [...naverOrders, ...coupangMatchOrders, ...coupangMismatchOrders].find(o => o.orderKey === ord.order_key);
+
+    const fee = ord.fee !== undefined ? ord.fee : (b2cOrder?.fee || 0);
+    const returnLoss = ord.return_loss !== undefined ? ord.return_loss : (b2cOrder?.returnLoss || 0);
+    const damage = ord.damage !== undefined ? ord.damage : (b2cOrder?.damage || 0);
+    const etc = ord.etc !== undefined ? ord.etc : (b2cOrder?.etc || 0);
+
     setEditingDashboardOrder(ord);
     setDashboardOrderForm({
       id: ord.id || '',
@@ -1331,8 +1355,12 @@ export default function App() {
       salesDate: ord.sales_date || '',
       dueDate: ord.due_date || '',
       grossAmount: Number(ord.gross_amount || 0),
+      fee: Number(fee || 0),
+      returnLoss: Number(returnLoss || 0),
+      damage: Number(damage || 0),
+      etc: Number(etc || 0),
       status: ord.status || 'PAID',
-      reason: ''
+      reason: ord.memo || ''
     });
   };
 
@@ -1342,6 +1370,18 @@ export default function App() {
     if (!editingDashboardOrder) return;
 
     const newGross = Math.max(0, Number(dashboardOrderForm.grossAmount) || 0);
+    const fee = Math.max(0, Number(dashboardOrderForm.fee) || 0);
+    const returnLoss = Math.max(0, Number(dashboardOrderForm.returnLoss) || 0);
+    const damage = Math.max(0, Number(dashboardOrderForm.damage) || 0);
+    const etc = Math.max(0, Number(dashboardOrderForm.etc) || 0);
+
+    const totalDeductions = fee + returnLoss + damage + etc;
+    if (totalDeductions > newGross) {
+      alert('공제액 합계가 결제 원금액을 초과할 수 없습니다. (음수 정산 방지)');
+      return;
+    }
+
+    const calculatedSettled = newGross - totalDeductions;
 
     // 1. salesRecords 갱신
     setSalesRecords(prev => prev.map(s => {
@@ -1353,7 +1393,13 @@ export default function App() {
           sales_date: dashboardOrderForm.salesDate,
           due_date: dashboardOrderForm.dueDate,
           gross_amount: newGross,
-          status: dashboardOrderForm.status
+          fee,
+          return_loss: returnLoss,
+          damage,
+          etc,
+          settled_amount: calculatedSettled,
+          status: dashboardOrderForm.status,
+          memo: dashboardOrderForm.reason
         };
       }
       return s;
@@ -1362,16 +1408,18 @@ export default function App() {
     // 2. 만약 B2C 데모 주문에도 존재하는 주문이면 동기화
     const syncDemo = (orders: DemoSettlementOrder[]) => orders.map(o => {
       if (o.orderKey === editingDashboardOrder.order_key) {
-        const totalDeductions = o.fee + o.returnLoss + o.damage + (o.etc || 0);
-        const newSettled = Math.max(0, newGross - totalDeductions);
         return {
           ...o,
           productName: dashboardOrderForm.productName,
           customer: dashboardOrderForm.buyerName,
           date: dashboardOrderForm.salesDate,
           grossAmount: newGross,
-          settledAmount: newSettled,
-          expectedSettledAmount: newSettled
+          fee,
+          returnLoss,
+          damage,
+          etc,
+          settledAmount: calculatedSettled,
+          expectedSettledAmount: calculatedSettled
         };
       }
       return o;
@@ -1387,13 +1435,13 @@ export default function App() {
       target_id: editingDashboardOrder.order_key,
       actor_email: currentRole === 'admin' ? 'admin@finance.corp' : 'finance@manager.corp',
       actor_role: currentRole,
-      memo: `[주문 상세 수정] ${editingDashboardOrder.order_key} (청구금액: ₩ ${newGross.toLocaleString()}, 상태: ${dashboardOrderForm.status})${dashboardOrderForm.reason ? ` - 사유: ${dashboardOrderForm.reason}` : ''}`,
-      amount: newGross,
+      memo: `[주문 상세 수정] ${editingDashboardOrder.order_key} (원금액: ₩ ${newGross.toLocaleString()}, 공제계: ₩ ${totalDeductions.toLocaleString()} ➔ 실정산: ₩ ${calculatedSettled.toLocaleString()}, 상태: ${dashboardOrderForm.status})${dashboardOrderForm.reason ? ` - 사유: ${dashboardOrderForm.reason}` : ''}`,
+      amount: calculatedSettled,
       created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
     };
     setAuditLogs(prev => [newAudit, ...prev]);
 
-    setActionSuccessMsg(`[주문 수정 완료] ${editingDashboardOrder.order_key} 주문의 청구 금액 및 상세 정보가 성공적으로 수정되었습니다.`);
+    setActionSuccessMsg(`[주문 수정 완료] ${editingDashboardOrder.order_key} 주문의 청구 금액, 차감 공제액 및 메모가 성공적으로 저장되었습니다.`);
     setTimeout(() => setActionSuccessMsg(''), 4500);
 
     setEditingDashboardOrder(null);
@@ -2544,6 +2592,11 @@ export default function App() {
                                                     {ord.product_name} {ord.buyer_name ? `(${ord.buyer_name})` : ''}
                                                   </div>
                                                 )}
+                                                {ord.memo && (
+                                                  <div className="text-[10px] text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 mt-1 inline-flex items-center gap-1 font-sans">
+                                                    <span>📝 {ord.memo}</span>
+                                                  </div>
+                                                )}
                                               </td>
                                               <td className="px-4 py-2.5 text-slate-600 font-medium text-center border-r border-slate-100 whitespace-nowrap">
                                                 {ord.sales_date}
@@ -2552,7 +2605,12 @@ export default function App() {
                                                 {ord.due_date}
                                               </td>
                                               <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-900 border-r border-slate-100 whitespace-nowrap">
-                                                ₩ {Number(ord.gross_amount || 0).toLocaleString()}
+                                                <div>₩ {Number(ord.gross_amount || 0).toLocaleString()}</div>
+                                                {((ord.fee || 0) + (ord.return_loss || 0) + (ord.damage || 0) + (ord.etc || 0)) > 0 && (
+                                                  <div className="text-[10px] font-normal text-emerald-700">
+                                                    실정산: ₩ {((ord.gross_amount || 0) - ((ord.fee || 0) + (ord.return_loss || 0) + (ord.damage || 0) + (ord.etc || 0))).toLocaleString()}
+                                                  </div>
+                                                )}
                                               </td>
                                               <td className="px-4 py-2.5 text-center border-r border-slate-100 whitespace-nowrap">
                                                 {ord.status === 'PAID' && (
@@ -4975,11 +5033,11 @@ export default function App() {
         </div>
       )}
       {/* ============================================================== */}
-      {/* 9-1. 대시보드 매출 원장 주문 상세 수정 모달                         */}
+      {/* 9-1. 대시보드 매출 원장 주문 상세 수정 모달 (차감 내역 포함)          */}
       {/* ============================================================== */}
       {editingDashboardOrder && (
         <div className="fixed inset-0 bg-[#0F172A]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-xl w-full p-6 shadow-2xl">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full p-6 shadow-2xl max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-[#1E40AF]">
@@ -4987,13 +5045,13 @@ export default function App() {
                 </div>
                 <div>
                   <h3 className="font-bold text-base text-[#0F172A] flex items-center gap-2">
-                    주문 / 청구 상세 정보 수정
+                    주문 / 청구 상세 및 정산 공제액 수정
                     <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-blue-50 text-[#1E40AF] border border-blue-200">
                       {editingDashboardOrder.order_key}
                     </span>
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    매출 원장의 주문 상품명, 청구 금액, 채권 상태를 직접 수정합니다.
+                    원금액과 플랫폼 공제 항목을 수정하면 실정산금액이 회계 공식에 따라 자동 재계산됩니다.
                   </p>
                 </div>
               </div>
@@ -5061,51 +5119,146 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">
-                    개별 청구 금액 (원금액) *
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-xs">₩</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="1000"
-                      required
-                      value={dashboardOrderForm.grossAmount}
-                      onChange={(e) => setDashboardOrderForm(prev => ({ ...prev, grossAmount: Number(e.target.value) }))}
-                      className="w-full text-xs pl-8 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20"
-                    />
+              {/* 금액 및 차감 공제 내역 설정 그리드 */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Receipt className="w-3.5 h-3.5 text-[#1E40AF]" />
+                    금액 및 플랫폼 차감 공제 내역 (원 단위)
+                  </span>
+                  <span className="text-[11px] text-slate-500 font-mono">
+                    원금액 = 실정산액 + 수수료 + 반품 + 파손
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      개별 청구 금액 (원금액) *
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-xs">₩</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        required
+                        value={dashboardOrderForm.grossAmount}
+                        onChange={(e) => setDashboardOrderForm(prev => ({ ...prev, grossAmount: Number(e.target.value) }))}
+                        className="w-full text-xs pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-white font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      플랫폼 수수료 차감액 (Fee)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-xs">- ₩</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="100"
+                        value={dashboardOrderForm.fee}
+                        onChange={(e) => setDashboardOrderForm(prev => ({ ...prev, fee: Number(e.target.value) }))}
+                        className="w-full text-xs pl-10 pr-3 py-2 rounded-xl border border-slate-200 bg-white font-mono focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      환불 / 반품 차감액 (Return Loss)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-rose-500 font-mono text-xs">- ₩</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="100"
+                        value={dashboardOrderForm.returnLoss}
+                        onChange={(e) => setDashboardOrderForm(prev => ({ ...prev, returnLoss: Number(e.target.value) }))}
+                        className="w-full text-xs pl-10 pr-3 py-2 rounded-xl border border-slate-200 bg-white font-mono text-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-200"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      파손 / 손실 차감액 (Damage Loss)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sky-500 font-mono text-xs">- ₩</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="100"
+                        value={dashboardOrderForm.damage}
+                        onChange={(e) => setDashboardOrderForm(prev => ({ ...prev, damage: Number(e.target.value) }))}
+                        className="w-full text-xs pl-10 pr-3 py-2 rounded-xl border border-slate-200 bg-white font-mono text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">
-                    건별 채권 상태
-                  </label>
-                  <select
-                    value={dashboardOrderForm.status}
-                    onChange={(e) => setDashboardOrderForm(prev => ({ ...prev, status: e.target.value }))}
-                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-semibold cursor-pointer"
-                  >
-                    <option value="PAID">🟢 정산 완료 (PAID)</option>
-                    <option value="UNPAID">🔵 정상 채권 (UNPAID)</option>
-                    <option value="OVERDUE">🔴 기한 초과 악성 채권 (OVERDUE)</option>
-                  </select>
-                </div>
+                {/* 실시간 회계 자동 재계산 배너 */}
+                {(() => {
+                  const gross = Number(dashboardOrderForm.grossAmount) || 0;
+                  const totalDeductions = (Number(dashboardOrderForm.fee) || 0) + (Number(dashboardOrderForm.returnLoss) || 0) + (Number(dashboardOrderForm.damage) || 0) + (Number(dashboardOrderForm.etc) || 0);
+                  const settled = gross - totalDeductions;
+                  const isOver = totalDeductions > gross;
+
+                  return (
+                    <div className={`p-3 rounded-xl border text-xs ${
+                      isOver 
+                        ? 'bg-rose-50 border-rose-300 text-rose-800'
+                        : 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+                    }`}>
+                      <div className="flex items-center justify-between font-bold">
+                        <span>회계 자동 재계산 결과:</span>
+                        <span className="font-mono text-sm">
+                          실제 정산금액: ₩ {settled.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-[11px] opacity-80 font-mono">
+                        <span>원금액 ₩ {gross.toLocaleString()} - 공제계 ₩ {totalDeductions.toLocaleString()}</span>
+                        <span>{isOver ? '⚠️ 공제액 초과 (저장 불가)' : '✅ 회계 공식 일치'}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">
+                  건별 채권 상태
+                </label>
+                <select
+                  value={dashboardOrderForm.status}
+                  onChange={(e) => setDashboardOrderForm(prev => ({ ...prev, status: e.target.value }))}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-semibold cursor-pointer"
+                >
+                  <option value="PAID">🟢 정산 완료 (PAID)</option>
+                  <option value="UNPAID">🔵 정상 채권 (UNPAID)</option>
+                  <option value="OVERDUE">🔴 기한 초과 악성 채권 (OVERDUE)</option>
+                </select>
               </div>
 
               <div>
                 <label className="text-xs font-semibold text-slate-600 block mb-1">
                   수정 사유 및 관리자 메모
                 </label>
-                <input
-                  type="text"
-                  placeholder="예: 엑셀 청구 금액 오타 정정, 고객 추가 발주 반영 등"
-                  value={dashboardOrderForm.reason}
-                  onChange={(e) => setDashboardOrderForm(prev => ({ ...prev, reason: e.target.value }))}
-                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20"
+                <textarea
+                  id="dashboard-order-memo"
+                  rows={2}
+                  placeholder="예: 엑셀 청구 금액 오타 정정, 수수료율 인하 반영, 고객 추가 발주 등"
+                  value={dashboardOrderForm.reason || ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setDashboardOrderForm(prev => ({ ...prev, reason: val }));
+                  }}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 resize-none font-sans"
                 />
               </div>
 
@@ -5119,11 +5272,14 @@ export default function App() {
                 </button>
                 <button
                   type="submit"
-                  disabled={Number(dashboardOrderForm.grossAmount) < 0}
+                  disabled={
+                    (Number(dashboardOrderForm.fee) || 0) + (Number(dashboardOrderForm.returnLoss) || 0) + (Number(dashboardOrderForm.damage) || 0) + (Number(dashboardOrderForm.etc) || 0) > (Number(dashboardOrderForm.grossAmount) || 0) ||
+                    Number(dashboardOrderForm.grossAmount) <= 0
+                  }
                   className="px-5 py-2 bg-[#1E40AF] hover:bg-blue-800 disabled:opacity-40 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 active:scale-95"
                 >
                   <CheckCheck className="w-4 h-4" />
-                  <span>수정 내용 원장 저장</span>
+                  <span>회계 재계산 및 수정 저장</span>
                 </button>
               </div>
             </form>
