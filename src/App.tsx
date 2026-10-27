@@ -495,6 +495,20 @@ export default function App() {
   const [coupangMismatchOrders, setCoupangMismatchOrders] = useState<DemoSettlementOrder[]>(COUPANG_MISMATCH_DEMO_ORDERS);
 
   // 주문 상세 수정 모달 상태 (Phase 1)
+  // 대시보드 주문 상세 수정 모달 상태
+  const [editingDashboardOrder, setEditingDashboardOrder] = useState<any | null>(null);
+  const [dashboardOrderForm, setDashboardOrderForm] = useState({
+    id: '',
+    orderKey: '',
+    productName: '',
+    buyerName: '',
+    salesDate: '',
+    dueDate: '',
+    grossAmount: 0,
+    status: 'PAID',
+    reason: ''
+  });
+
   const [editingOrder, setEditingOrder] = useState<DemoSettlementOrder | null>(null);
   const [editOrderForm, setEditOrderForm] = useState<{
     orderKey: string;
@@ -1306,6 +1320,85 @@ export default function App() {
   };
 
   // 4.3 정산 대사 통합 결과 엑셀 다운로드 (보고서 내보내기 & 엑셀 스타일/틀 정돈)
+  // 대시보드 주문 상세 수정 모달 열기
+  const handleOpenDashboardOrderEdit = (ord: any) => {
+    setEditingDashboardOrder(ord);
+    setDashboardOrderForm({
+      id: ord.id || '',
+      orderKey: ord.order_key,
+      productName: ord.product_name || '',
+      buyerName: ord.buyer_name || '',
+      salesDate: ord.sales_date || '',
+      dueDate: ord.due_date || '',
+      grossAmount: Number(ord.gross_amount || 0),
+      status: ord.status || 'PAID',
+      reason: ''
+    });
+  };
+
+  // 대시보드 주문 상세 수정 저장
+  const handleSaveDashboardOrder = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDashboardOrder) return;
+
+    const newGross = Math.max(0, Number(dashboardOrderForm.grossAmount) || 0);
+
+    // 1. salesRecords 갱신
+    setSalesRecords(prev => prev.map(s => {
+      if (s.id === editingDashboardOrder.id || s.order_key === editingDashboardOrder.order_key) {
+        return {
+          ...s,
+          product_name: dashboardOrderForm.productName,
+          buyer_name: dashboardOrderForm.buyerName,
+          sales_date: dashboardOrderForm.salesDate,
+          due_date: dashboardOrderForm.dueDate,
+          gross_amount: newGross,
+          status: dashboardOrderForm.status
+        };
+      }
+      return s;
+    }));
+
+    // 2. 만약 B2C 데모 주문에도 존재하는 주문이면 동기화
+    const syncDemo = (orders: DemoSettlementOrder[]) => orders.map(o => {
+      if (o.orderKey === editingDashboardOrder.order_key) {
+        const totalDeductions = o.fee + o.returnLoss + o.damage + (o.etc || 0);
+        const newSettled = Math.max(0, newGross - totalDeductions);
+        return {
+          ...o,
+          productName: dashboardOrderForm.productName,
+          customer: dashboardOrderForm.buyerName,
+          date: dashboardOrderForm.salesDate,
+          grossAmount: newGross,
+          settledAmount: newSettled,
+          expectedSettledAmount: newSettled
+        };
+      }
+      return o;
+    });
+    setNaverOrders(syncDemo);
+    setCoupangMatchOrders(syncDemo);
+    setCoupangMismatchOrders(syncDemo);
+
+    // 3. 감사 로그 기록
+    const newAudit = {
+      id: `a-${Date.now()}`,
+      action_type: 'ORDER_DETAIL_EDITED',
+      target_id: editingDashboardOrder.order_key,
+      actor_email: currentRole === 'admin' ? 'admin@finance.corp' : 'finance@manager.corp',
+      actor_role: currentRole,
+      memo: `[주문 상세 수정] ${editingDashboardOrder.order_key} (청구금액: ₩ ${newGross.toLocaleString()}, 상태: ${dashboardOrderForm.status})${dashboardOrderForm.reason ? ` - 사유: ${dashboardOrderForm.reason}` : ''}`,
+      amount: newGross,
+      created_at: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    };
+    setAuditLogs(prev => [newAudit, ...prev]);
+
+    setActionSuccessMsg(`[주문 수정 완료] ${editingDashboardOrder.order_key} 주문의 청구 금액 및 상세 정보가 성공적으로 수정되었습니다.`);
+    setTimeout(() => setActionSuccessMsg(''), 4500);
+
+    setEditingDashboardOrder(null);
+  };
+
   // 주문 상세 수정 모달 열기 (Phase 1)
   const handleOpenEditOrderModal = (ord: DemoSettlementOrder) => {
     setEditingOrder(ord);
@@ -2424,11 +2517,12 @@ export default function App() {
                                     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
                                       <table className="w-full text-xs table-fixed">
                                         <colgroup>
-                                          <col className="w-[32%]" />
+                                          <col className="w-[30%]" />
+                                          <col className="w-[14%]" />
                                           <col className="w-[16%]" />
-                                          <col className="w-[18%]" />
-                                          <col className="w-[18%]" />
                                           <col className="w-[16%]" />
+                                          <col className="w-[14%]" />
+                                          <col className="w-[10%]" />
                                         </colgroup>
                                         <thead className="bg-[#F8FAFC] text-slate-600 font-bold border-b border-slate-200 text-[11px]">
                                           <tr>
@@ -2436,7 +2530,8 @@ export default function App() {
                                             <th className="px-4 py-2.5 text-center border-r border-slate-200 whitespace-nowrap">매출인식일</th>
                                             <th className="px-4 py-2.5 text-center border-r border-slate-200 whitespace-nowrap">정산예정일 (+30D)</th>
                                             <th className="px-4 py-2.5 text-right border-r border-slate-200 whitespace-nowrap">개별 청구 금액</th>
-                                            <th className="px-4 py-2.5 text-center whitespace-nowrap">건별 채권 상태</th>
+                                            <th className="px-4 py-2.5 text-center border-r border-slate-200 whitespace-nowrap">건별 채권 상태</th>
+                                            <th className="px-3 py-2.5 text-center whitespace-nowrap">관리</th>
                                           </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100 bg-white">
@@ -2459,7 +2554,7 @@ export default function App() {
                                               <td className="px-4 py-2.5 text-right font-mono font-bold text-slate-900 border-r border-slate-100 whitespace-nowrap">
                                                 ₩ {Number(ord.gross_amount || 0).toLocaleString()}
                                               </td>
-                                              <td className="px-4 py-2.5 text-center whitespace-nowrap">
+                                              <td className="px-4 py-2.5 text-center border-r border-slate-100 whitespace-nowrap">
                                                 {ord.status === 'PAID' && (
                                                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
                                                     🟢 정산 완료
@@ -2475,6 +2570,20 @@ export default function App() {
                                                     🔴 기한 초과 악성 채권
                                                   </span>
                                                 )}
+                                              </td>
+                                              <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleOpenDashboardOrderEdit(ord);
+                                                  }}
+                                                  disabled={currentRole === 'viewer'}
+                                                  className="px-2.5 py-1 rounded-lg border border-slate-200 hover:border-[#1E40AF] text-slate-600 hover:text-[#1E40AF] hover:bg-blue-50/60 transition inline-flex items-center gap-1 text-[11px] font-semibold disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+                                                  title="주문 정보 및 청구 금액 수정"
+                                                >
+                                                  <Edit2 className="w-3 h-3 text-[#1E40AF]" />
+                                                  <span>수정</span>
+                                                </button>
                                               </td>
                                             </tr>
                                           ))}
@@ -4865,6 +4974,163 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* ============================================================== */}
+      {/* 9-1. 대시보드 매출 원장 주문 상세 수정 모달                         */}
+      {/* ============================================================== */}
+      {editingDashboardOrder && (
+        <div className="fixed inset-0 bg-[#0F172A]/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-xl w-full p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-[#1E40AF]">
+                  <Edit2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-[#0F172A] flex items-center gap-2">
+                    주문 / 청구 상세 정보 수정
+                    <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-blue-50 text-[#1E40AF] border border-blue-200">
+                      {editingDashboardOrder.order_key}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    매출 원장의 주문 상품명, 청구 금액, 채권 상태를 직접 수정합니다.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingDashboardOrder(null)}
+                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDashboardOrder} className="mt-5 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">
+                    매출인식일
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={dashboardOrderForm.salesDate}
+                    onChange={(e) => setDashboardOrderForm(prev => ({ ...prev, salesDate: e.target.value }))}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">
+                    정산예정일 (+30D)
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={dashboardOrderForm.dueDate}
+                    onChange={(e) => setDashboardOrderForm(prev => ({ ...prev, dueDate: e.target.value }))}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">
+                    상품명 *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="상품명을 입력하세요"
+                    value={dashboardOrderForm.productName}
+                    onChange={(e) => setDashboardOrderForm(prev => ({ ...prev, productName: e.target.value }))}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1">
+                    고객명 / 주문자명
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="고객명을 입력하세요"
+                    value={dashboardOrderForm.buyerName}
+                    onChange={(e) => setDashboardOrderForm(prev => ({ ...prev, buyerName: e.target.value }))}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    개별 청구 금액 (원금액) *
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-xs">₩</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1000"
+                      required
+                      value={dashboardOrderForm.grossAmount}
+                      onChange={(e) => setDashboardOrderForm(prev => ({ ...prev, grossAmount: Number(e.target.value) }))}
+                      className="w-full text-xs pl-8 pr-3 py-2.5 rounded-xl border border-slate-200 bg-white font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">
+                    건별 채권 상태
+                  </label>
+                  <select
+                    value={dashboardOrderForm.status}
+                    onChange={(e) => setDashboardOrderForm(prev => ({ ...prev, status: e.target.value }))}
+                    className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20 font-semibold cursor-pointer"
+                  >
+                    <option value="PAID">🟢 정산 완료 (PAID)</option>
+                    <option value="UNPAID">🔵 정상 채권 (UNPAID)</option>
+                    <option value="OVERDUE">🔴 기한 초과 악성 채권 (OVERDUE)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
+                  수정 사유 및 관리자 메모
+                </label>
+                <input
+                  type="text"
+                  placeholder="예: 엑셀 청구 금액 오타 정정, 고객 추가 발주 반영 등"
+                  value={dashboardOrderForm.reason}
+                  onChange={(e) => setDashboardOrderForm(prev => ({ ...prev, reason: e.target.value }))}
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#1E40AF]/20"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingDashboardOrder(null)}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  disabled={Number(dashboardOrderForm.grossAmount) < 0}
+                  className="px-5 py-2 bg-[#1E40AF] hover:bg-blue-800 disabled:opacity-40 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 active:scale-95"
+                >
+                  <CheckCheck className="w-4 h-4" />
+                  <span>수정 내용 원장 저장</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ============================================================== */}
       {/* 9. 모달: 주문 상세 및 정산 공제액 수정 모달 (Phase 1)             */}
       {/* ============================================================== */}
