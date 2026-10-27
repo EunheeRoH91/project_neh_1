@@ -1128,10 +1128,40 @@ export default function App() {
       alias_active: suspensePartnerForm.alias_active
     };
 
-    // 1. 거래처 목록(partnersList)에 추가
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const dateCompact = todayStr.replace(/-/g, '');
+    const newInvoiceKey = `INV-${dateCompact}-${Math.floor(100 + Math.random() * 900)}`;
+    const depositAmt = Number(registeringSuspense.amount || 0);
+
+    const newSalesRecord = {
+      id: `s-${Date.now()}`,
+      order_key: newInvoiceKey,
+      product_name: `${createdPartner.company_name} 제품 공급/정산 (가수금 연동)`,
+      buyer_name: createdPartner.ceo_name,
+      sales_date: todayStr,
+      due_date: todayStr,
+      gross_amount: depositAmt,
+      settled_amount: depositAmt,
+      fee: 0,
+      return_loss: 0,
+      damage: 0,
+      etc: 0,
+      status: 'PAID', // 통장 입금이 확인된 상태이므로 입금 완료(PAID) 전표 생성
+      memo: `가수금 수동 등록 및 즉시 입금 연동 (통장 적요: ${registeringSuspense.sender_name})`,
+      business_partners: {
+        company_name: createdPartner.company_name,
+        channel_type: createdPartner.channel_type,
+        ceo_name: createdPartner.ceo_name
+      }
+    };
+
+    // 1. 거래처 목록(partnersList)에 신규 거래처 마스터 추가
     setPartnersList(prev => [createdPartner, ...prev]);
 
-    // 2. 가수금 목록(suspenseList)에서 해당 건 연동 종결 처리
+    // 2. 판매 매출 원장(salesRecords)에 정식 매출/정산 전표 자동 생성 (판매 매출 대시보드 실시간 연동!)
+    setSalesRecords(prev => [newSalesRecord, ...prev]);
+
+    // 3. 가수금 목록(suspenseList)에서 해당 건 연동 종결 처리
     setSuspenseList(prev => prev.filter(s => s.id !== registeringSuspense.id));
 
     // 3. 감사 로그 기록
@@ -1151,11 +1181,11 @@ export default function App() {
     setRegisteringSuspense(null);
 
     // 5. 성공 메시지 및 거래처 관리 탭으로 화면 전환
-    setActionSuccessMsg(`[거래처 수동 등록 완료] '${createdPartner.company_name}'이(가) 거래처 관리 탭에 신규 연동 등록되었습니다.`);
-    setTimeout(() => setActionSuccessMsg(''), 4500);
+    setActionSuccessMsg(`[매출 원장 & 거래처 연동 완료] '${createdPartner.company_name}' (₩ ${depositAmt.toLocaleString()})이(가) 판매 매출 대시보드 및 거래처 관리 탭에 성공적으로 등록되었습니다.`);
+    setTimeout(() => setActionSuccessMsg(''), 5500);
 
-    // 거래처 관리 탭으로 즉시 화면 전환하여 연동 결과 시각적 확인
-    setActiveTab('partners');
+    // 판매 매출 대시보드로 즉시 화면 전환하여 신규 매출/정산 건 확인 가능
+    setActiveTab('dashboard');
   };
 
   // 5.2 동명/동일 금액 중복 충돌 수동 분개 확정 (Admin)
@@ -1165,10 +1195,23 @@ export default function App() {
     const candidateName = selectedCandidate === 'beta' ? '(주)베타로지스' : '(주)감마글로벌';
     const candidateInvoice = selectedCandidate === 'beta' ? 'INV-20260901-004' : 'INV-20260905-005';
 
-    // 1. 해당 매출 원장 PAID 상태로 전이
+    const resolvedAmount = Number(conflictModalItem.amount || 0);
+
+    // 1. 해당 매출 원장 PAID 상태로 전이 (판매 매출 대시보드에 즉시 반영)
     setSalesRecords(prev => prev.map(s => s.order_key === candidateInvoice ? { ...s, status: 'PAID' } : s));
 
-    // 2. 가수금 목록에서 해당 건 제거
+    // 2. 거래처 목록(partnersList)에서 미수금 차감 연동
+    setPartnersList(prev => prev.map(p => {
+      if (p.company_name === candidateName) {
+        return {
+          ...p,
+          uncollected: Math.max(0, Number(p.uncollected || 0) - resolvedAmount)
+        };
+      }
+      return p;
+    }));
+
+    // 3. 가수금 목록에서 해당 건 제거
     setSuspenseList(prev => prev.filter(s => s.id !== conflictModalItem.id));
 
     // 3. 감사 로그(Audit Trail)에 정식 기록
