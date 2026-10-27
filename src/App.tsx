@@ -1136,7 +1136,7 @@ export default function App() {
     const newSalesRecord = {
       id: `s-${Date.now()}`,
       order_key: newInvoiceKey,
-      product_name: `${createdPartner.company_name} 제품 공급/정산 (가수금 연동)`,
+      product_name: `${createdPartner.company_name} 제품 공급 계약`,
       buyer_name: createdPartner.ceo_name,
       sales_date: todayStr,
       due_date: todayStr,
@@ -1147,7 +1147,7 @@ export default function App() {
       damage: 0,
       etc: 0,
       status: 'PAID', // 통장 입금이 확인된 상태이므로 입금 완료(PAID) 전표 생성
-      memo: `가수금 수동 등록 및 즉시 입금 연동 (통장 적요: ${registeringSuspense.sender_name})`,
+      memo: '',
       business_partners: {
         company_name: createdPartner.company_name,
         channel_type: createdPartner.channel_type,
